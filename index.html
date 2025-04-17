@@ -1,0 +1,1879 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NewsFlow - Seu Leitor de Notícias Inteligente</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .card-hover:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+        
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        
+        .skeleton {
+            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+        }
+        
+        .dark .skeleton {
+            background: linear-gradient(90deg, #2d3748 25%, #4a5568 50%, #2d3748 75%);
+            background-size: 200% 100%;
+        }
+        
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        /* Custom scrollbar for settings panel */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        
+        .dark .custom-scrollbar::-webkit-scrollbar-track {
+            background: #374151;
+        }
+        
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #6b7280;
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 16px;
+            border-radius: 8px;
+            color: white;
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in 2.7s forwards;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        
+        @keyframes fadeOut {
+            to { opacity: 0; }
+        }
+        
+        .toast-success {
+            background-color: #10B981;
+        }
+        
+        .toast-error {
+            background-color: #EF4444;
+        }
+        
+        .toast-info {
+            background-color: #3B82F6;
+        }
+        
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-200 min-h-screen">
+    <!-- Header -->
+    <header class="sticky top-0 z-10 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-sm">
+        <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <i class="fas fa-newspaper text-2xl text-primary-600 dark:text-primary-400"></i>
+                <h1 class="text-xl font-bold text-primary-600 dark:text-primary-400">NewsFlow</h1>
+            </div>
+            
+            <div class="flex items-center space-x-4">
+                <button id="theme-toggle" aria-label="Alternar tema claro/escuro" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                    <i class="fas fa-moon dark:hidden"></i>
+                    <i class="fas fa-sun hidden dark:inline"></i>
+                </button>
+                
+                <button id="refresh-btn" aria-label="Atualizar notícias" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                    <i class="fas fa-sync-alt"></i>
+                </button>
+                
+                <button id="settings-btn" aria-label="Abrir configurações" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
+                    <i class="fas fa-cog"></i>
+                </button>
+                
+                <button id="filter-btn" aria-label="Abrir filtros (móvel)" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors md:hidden">
+                    <i class="fas fa-filter"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Search Bar -->
+    <div class="container mx-auto px-4 py-4">
+        <div class="relative max-w-2xl mx-auto">
+            <input type="text" id="search-input" placeholder="Buscar notícias..."
+                    class="w-full pl-10 pr-4 py-2 rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all">
+            <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+        </div>
+    </div>
+
+    <!-- Categories (Desktop) -->
+    <div id="categories-container" class="container mx-auto px-4 py-2 overflow-x-auto scrollbar-hide hidden md:block">
+        <div class="flex space-x-2">
+            <button class="category-btn px-4 py-1 rounded-full bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 font-medium whitespace-nowrap" data-category="all">Todas</button>
+            <button class="category-btn px-4 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap" data-category="brasil">Brasil</button>
+            <button class="category-btn px-4 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap" data-category="mundo">Mundo</button>
+            <button class="category-btn px-4 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap" data-category="politica">Política</button>
+            <button class="category-btn px-4 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap" data-category="economia">Economia</button>
+            <button class="category-btn px-4 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap" data-category="tecnologia">Tecnologia</button>
+            <button class="category-btn px-4 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap" data-category="esportes">Esportes</button>
+            <button class="category-btn px-4 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap" data-category="saude">Saúde</button>
+            <button class="category-btn px-4 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap" data-category="entretenimento">Entretenimento</button>
+            <button class="category-btn px-4 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap" data-category="ciencia">Ciência</button>
+        </div>
+    </div>
+
+    <!-- Filter Dropdown (Mobile) -->
+    <div id="filter-dropdown" class="hidden fixed inset-0 z-20 bg-black/50 md:hidden" role="dialog" aria-modal="true" aria-labelledby="filter-title">
+        <div class="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 rounded-t-2xl p-4 transform transition-transform duration-300 translate-y-full">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="filter-title" class="text-lg font-semibold">Filtrar Notícias</h3>
+                <button id="close-filter-btn" aria-label="Fechar filtros" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-2">
+                <div>
+                    <label for="mobile-category-select" class="block text-sm font-medium mb-1">Categorias</label>
+                    <select id="mobile-category-select" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
+                        <option value="all">Todas</option>
+                        <option value="brasil">Brasil</option>
+                        <option value="mundo">Mundo</option>
+                        <option value="politica">Política</option>
+                        <option value="economia">Economia</option>
+                        <option value="tecnologia">Tecnologia</option>
+                        <option value="esportes">Esportes</option>
+                        <option value="saude">Saúde</option>
+                        <option value="entretenimento">Entretenimento</option>
+                        <option value="ciencia">Ciência</option>
+                    </select>
+                </div>
+                
+                <!-- Source Filter (can be dynamically populated later) -->
+                <!-- <div>
+                    <label for="mobile-source-select" class="block text-sm font-medium mb-1">Fontes</label>
+                    <select id="mobile-source-select" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
+                        <option value="all">Todas</option>
+                        <option value="g1">G1</option>
+                        <option value="uol">UOL</option>
+                         Add more sources dynamically
+                    </select>
+                </div> -->
+                
+                <button id="apply-filter-btn" class="w-full mt-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors">
+                    Aplicar Filtros
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div id="settings-panel" class="hidden fixed inset-0 z-30 bg-black/50" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <div class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white dark:bg-gray-800 shadow-xl transform transition-transform duration-300 translate-x-full overflow-y-auto custom-scrollbar">
+            <div class="p-6">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 id="settings-title" class="text-xl font-bold flex items-center">
+                        <i class="fas fa-cog mr-2"></i> Configurações
+                    </h2>
+                    <button id="close-settings-btn" aria-label="Fechar configurações" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <!-- Admin Login Section -->
+                <div id="admin-login-section" class="mb-8 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                    <h3 class="font-medium mb-3 flex items-center">
+                        <i class="fas fa-lock mr-2"></i> Acesso Administrativo
+                    </h3>
+                    
+                    <div id="login-form">
+                         <p class="text-xs text-red-500 mb-2">DEMO: Use usuário 'admin' e senha 'admin123'</p>
+                        <div class="mb-3">
+                            <label for="admin-username" class="block text-sm font-medium mb-1">Usuário</label>
+                            <input type="text" id="admin-username" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
+                        </div>
+                        <div class="mb-3">
+                            <label for="admin-password" class="block text-sm font-medium mb-1">Senha</label>
+                            <input type="password" id="admin-password" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
+                        </div>
+                        <button id="login-btn" class="w-full py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors">
+                            Entrar
+                        </button>
+                    </div>
+                    
+                    <div id="admin-controls" class="hidden">
+                        <div class="flex justify-between items-center mb-3">
+                            <span class="text-sm font-medium">Modo Administrador Ativo</span>
+                            <button id="logout-btn" class="text-sm text-primary-600 dark:text-primary-400 hover:underline">
+                                Sair
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- RSS Feeds Management -->
+                <div id="rss-management-section" class="mb-8 hidden">
+                    <h3 class="font-medium mb-3 flex items-center">
+                        <i class="fas fa-rss mr-2"></i> Gerenciamento de Feeds RSS
+                    </h3>
+                    
+                    <div class="mb-4">
+                        <button id="add-feed-btn" class="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors mb-3">
+                            <i class="fas fa-plus mr-2"></i> Adicionar Novo Feed
+                        </button>
+                        
+                        <div id="add-feed-form" class="hidden p-4 border border-gray-200 dark:border-gray-700 rounded-lg mb-4">
+                            <input type="hidden" id="editing-feed-id">
+                            <div class="mb-3">
+                                <label for="new-feed-name" class="block text-sm font-medium mb-1">Nome do Feed</label>
+                                <input type="text" id="new-feed-name" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
+                            </div>
+                            <div class="mb-3">
+                                <label for="new-feed-url" class="block text-sm font-medium mb-1">URL do Feed RSS</label>
+                                <input type="url" id="new-feed-url" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
+                            </div>
+                            <div class="mb-3">
+                                <label for="new-feed-category" class="block text-sm font-medium mb-1">Categoria</label>
+                                <select id="new-feed-category" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
+                                    <option value="brasil">Brasil</option>
+                                    <option value="mundo">Mundo</option>
+                                    <option value="politica">Política</option>
+                                    <option value="economia">Economia</option>
+                                    <option value="tecnologia">Tecnologia</option>
+                                    <option value="esportes">Esportes</option>
+                                    <option value="saude">Saúde</option>
+                                    <option value="entretenimento">Entretenimento</option>
+                                    <option value="ciencia">Ciência</option>
+                                </select>
+                            </div>
+                            <div class="flex space-x-2">
+                                <button id="save-feed-btn" class="flex-1 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors">
+                                    Salvar
+                                </button>
+                                <button id="cancel-feed-btn" type="button" class="flex-1 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-md transition-colors">
+                                    Cancelar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div id="rss-feeds-list" class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+                        <div class="p-3 text-center text-gray-500">
+                            <i class="fas fa-lock mr-1"></i> Faça login para gerenciar feeds
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Fallback Images Management -->
+                <div id="fallback-images-section" class="mb-8 hidden">
+                    <h3 class="font-medium mb-3 flex items-center">
+                        <i class="fas fa-image mr-2"></i> Imagens Padrão (Fallback)
+                    </h3>
+                    
+                    <div class="mb-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                        <label for="global-fallback-image" class="block text-sm font-medium mb-2">Imagem Padrão Global</label>
+                        <div class="flex items-center space-x-2">
+                            <input type="url" id="global-fallback-image" placeholder="URL da imagem global"
+                                    class="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
+                            <button id="save-global-fallback" class="px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors text-sm">
+                                Salvar
+                            </button>
+                        </div>
+                        <div id="current-global-fallback" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            Atual: <span id="current-global-fallback-url" class="break-all">Nenhuma definida</span>
+                        </div>
+                    </div>
+                    
+                    <div class="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                        <label class="block text-sm font-medium mb-2">Imagens por Categoria</label>
+                        <div class="space-y-3" id="category-images-list">
+                             <div class="p-3 text-center text-gray-500">
+                                <i class="fas fa-lock mr-1"></i> Faça login para gerenciar imagens
+                            </div>
+                        </div>
+                         <button id="save-category-fallbacks" class="w-full mt-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors">
+                            Salvar Imagens de Categoria
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- App Settings -->
+                <div class="mb-8 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                    <h3 class="font-medium mb-3 flex items-center">
+                        <i class="fas fa-sliders-h mr-2"></i> Configurações Gerais
+                    </h3>
+                    
+                    <div class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <label for="default-theme" class="text-sm font-medium">Tema Padrão</label>
+                            <select id="default-theme" class="p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
+                                <option value="system">Seguir sistema</option>
+                                <option value="light">Claro</option>
+                                <option value="dark">Escuro</option>
+                            </select>
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                            <label for="items-per-page" class="text-sm font-medium">Notícias por página</label>
+                            <select id="items-per-page" class="p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
+                                <option value="6">6</option>
+                                <option value="12">12</option>
+                                <option value="18">18</option>
+                                <option value="24">24</option>
+                            </select>
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                            <label for="show-ads-toggle" class="text-sm font-medium">Mostrar anúncios</label>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="show-ads-toggle" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
+                            </label>
+                        </div>
+                        
+                        <div class="flex items-center justify-between">
+                            <label for="ad-frequency" class="text-sm font-medium">Frequência de anúncios</label>
+                            <select id="ad-frequency" class="p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
+                                <option value="low">Baixa (15 cliques)</option>
+                                <option value="medium">Média (10 cliques)</option>
+                                <option value="high">Alta (5 cliques)</option>
+                            </select>
+                        </div>
+                        
+                        <button id="save-app-settings" class="w-full mt-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors">
+                            Salvar Configurações Gerais
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- AdMob Settings -->
+                <div id="admob-settings-section" class="mb-8 p-4 border border-gray-200 dark:border-gray-700 rounded-lg hidden">
+                    <h3 class="font-medium mb-3 flex items-center">
+                        <i class="fas fa-ad mr-2"></i> Configurações do Google AdMob
+                    </h3>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Insira os IDs das suas unidades de anúncio AdMob. Use IDs de teste se não tiver os reais.</p>
+                    
+                    <div class="space-y-3">
+                        <div class="mb-2">
+                            <label for="admob-app-id" class="block text-xs font-medium mb-1">App ID (Para Apps Nativos)</label>
+                            <input type="text" id="admob-app-id" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
+                        </div>
+                        <div class="mb-2">
+                            <label for="admob-banner-id" class="block text-xs font-medium mb-1">Banner Adaptativo (ID Unidade)</label>
+                            <input type="text" id="admob-banner-id" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
+                        </div>
+                        <div class="mb-2">
+                            <label for="admob-fixed-banner-id" class="block text-xs font-medium mb-1">Banner Fixo (ID Unidade)</label>
+                            <input type="text" id="admob-fixed-banner-id" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
+                        </div>
+                        <div class="mb-2">
+                            <label for="admob-interstitial-id" class="block text-xs font-medium mb-1">Intersticial (ID Unidade)</label>
+                            <input type="text" id="admob-interstitial-id" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
+                        </div>
+                        <div class="mb-2">
+                            <label for="admob-rewarded-id" class="block text-xs font-medium mb-1">Premiado (ID Unidade)</label>
+                            <input type="text" id="admob-rewarded-id" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
+                        </div>
+                        <div class="mb-2">
+                            <label for="admob-rewarded-interstitial-id" class="block text-xs font-medium mb-1">Intersticial Premiado (ID Unidade)</label>
+                            <input type="text" id="admob-rewarded-interstitial-id" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
+                        </div>
+                        <div class="mb-2">
+                            <label for="admob-native-id" class="block text-xs font-medium mb-1">Nativo (ID Unidade)</label>
+                            <input type="text" id="admob-native-id" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
+                        </div>
+                        <div class="mb-2">
+                            <label for="admob-native-video-id" class="block text-xs font-medium mb-1">Vídeo Nativo (ID Unidade)</label>
+                            <input type="text" id="admob-native-video-id" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
+                        </div>
+                        
+                        <button id="save-admob-settings" class="w-full mt-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors">
+                            Salvar IDs AdMob
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-6">
+        <!-- Loading Skeleton -->
+        <div id="loading-skeleton" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Skeleton items -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+                <div class="h-48 skeleton"></div>
+                <div class="p-4 space-y-3">
+                    <div class="flex space-x-2">
+                        <div class="h-5 w-16 rounded skeleton"></div>
+                        <div class="h-5 w-12 rounded skeleton"></div>
+                    </div>
+                    <div class="h-6 rounded skeleton"></div>
+                    <div class="h-4 rounded skeleton"></div>
+                    <div class="h-4 w-3/4 rounded skeleton"></div>
+                    <div class="flex justify-between items-center mt-2">
+                        <div class="h-4 w-20 rounded skeleton"></div>
+                        <div class="h-6 w-6 rounded-full skeleton"></div>
+                    </div>
+                </div>
+            </div>
+             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+                <div class="h-48 skeleton"></div>
+                <div class="p-4 space-y-3">
+                    <div class="flex space-x-2">
+                        <div class="h-5 w-16 rounded skeleton"></div>
+                        <div class="h-5 w-12 rounded skeleton"></div>
+                    </div>
+                    <div class="h-6 rounded skeleton"></div>
+                    <div class="h-4 rounded skeleton"></div>
+                    <div class="h-4 w-3/4 rounded skeleton"></div>
+                     <div class="flex justify-between items-center mt-2">
+                        <div class="h-4 w-20 rounded skeleton"></div>
+                        <div class="h-6 w-6 rounded-full skeleton"></div>
+                    </div>
+                </div>
+            </div>
+             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden hidden lg:block">
+                <div class="h-48 skeleton"></div>
+                <div class="p-4 space-y-3">
+                     <div class="flex space-x-2">
+                        <div class="h-5 w-16 rounded skeleton"></div>
+                        <div class="h-5 w-12 rounded skeleton"></div>
+                    </div>
+                    <div class="h-6 rounded skeleton"></div>
+                    <div class="h-4 rounded skeleton"></div>
+                    <div class="h-4 w-3/4 rounded skeleton"></div>
+                     <div class="flex justify-between items-center mt-2">
+                        <div class="h-4 w-20 rounded skeleton"></div>
+                        <div class="h-6 w-6 rounded-full skeleton"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- News Grid -->
+        <div id="news-grid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- News cards will be inserted here by JavaScript -->
+        </div>
+        
+        <!-- Load More Button -->
+        <div id="load-more-container" class="mt-8 text-center hidden">
+            <button id="load-more-btn" class="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors">
+                Carregar Mais Notícias
+            </button>
+        </div>
+        
+        <!-- No Results Message -->
+        <div id="no-results" class="hidden text-center py-12">
+            <i class="fas fa-newspaper text-4xl text-gray-400 mb-4"></i>
+            <h3 class="text-xl font-medium text-gray-600 dark:text-gray-300">Nenhuma notícia encontrada</h3>
+            <p class="text-gray-500 dark:text-gray-400 mt-2">Tente ajustar seus filtros ou buscar por palavras diferentes.</p>
+        </div>
+    </main>
+
+    <!-- Ad Banner (Simulation) -->
+    <div class="bg-gray-100 dark:bg-gray-800 py-4 mt-8">
+        <div class="container mx-auto px-4">
+            <div class="bg-white dark:bg-gray-700 rounded-lg p-4 text-center">
+                <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">Publicidade (Simulação)</p>
+                <div id="ad-banner" class="h-20 bg-gray-200 dark:bg-gray-600 rounded flex items-center justify-center">
+                    <p class="text-gray-500 dark:text-gray-400">Banner Adaptativo (AdMob ID: <span id="sim-banner-id">...</span>)</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- News Modal -->
+    <div id="news-modal" class="hidden fixed inset-0 z-30 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-overlay absolute inset-0"></div>
+        
+        <div class="relative min-h-screen flex items-center justify-center p-4">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+                 <!-- Modal Header -->
+                <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-start">
+                    <div>
+                        <span id="modal-category" class="inline-block px-2 py-1 text-xs font-medium rounded-full bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300"></span>
+                        <span id="modal-source" class="inline-block px-2 py-1 ml-2 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"></span>
+                    </div>
+                    <button id="close-modal-btn" aria-label="Fechar notícia" class="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 -mt-1 -mr-1">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <!-- Modal Content -->
+                <div class="p-6 overflow-y-auto flex-grow">
+                    <h2 id="modal-title" class="text-2xl font-bold mb-3"></h2>
+                    <p id="modal-date" class="text-sm text-gray-500 dark:text-gray-400 mb-4"></p>
+                    
+                    <div id="modal-image-container" class="mb-6 rounded-lg overflow-hidden">
+                        <img id="modal-image" src="" alt="" class="w-full h-48 md:h-64 object-cover">
+                    </div>
+                    
+                    <div id="modal-content" class="prose dark:prose-invert max-w-none mb-6 line-clamp-3"></div>
+                </div>
+                
+                <!-- Modal Footer -->
+                <div class="p-4 border-t border-gray-200 dark:border-gray-700">
+                     <div class="flex flex-wrap gap-3 mb-4">
+                        <a id="full-article-btn" href="#" target="_blank" rel="noopener noreferrer" class="flex-1 text-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors text-sm sm:flex-none">
+                            <i class="fas fa-external-link-alt mr-1"></i> Ler Completa
+                        </a>
+                        <button id="speak-btn" class="flex-1 text-center px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-md transition-colors text-sm sm:flex-none">
+                            <i class="fas fa-volume-up mr-1"></i> Ouvir
+                        </button>
+                        <button id="share-btn" class="flex-1 text-center px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-md transition-colors text-sm sm:flex-none">
+                            <i class="fas fa-share-alt mr-1"></i> Compartilhar
+                        </button>
+                    </div>
+                    
+                    <!-- Ad in Modal (Simulation) -->
+                    <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Publicidade (Simulação)</p>
+                        <div id="modal-ad" class="h-16 bg-gray-200 dark:bg-gray-600 rounded flex items-center justify-center">
+                            <p class="text-gray-500 dark:text-gray-400 text-sm">Banner Adaptativo (AdMob)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Interstitial Ad (Simulation - Hidden) -->
+    <div id="interstitial-ad" class="hidden fixed inset-0 z-40 bg-black/90 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="interstitial-title">
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md mx-4 text-center">
+             <button id="force-close-ad-btn" aria-label="Fechar anúncio" class="absolute top-2 right-2 p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full z-50">
+                 <i class="fas fa-times"></i>
+            </button>
+            <div class="text-center mb-4">
+                <i class="fas fa-ad text-4xl text-primary-600 dark:text-primary-400 mb-3"></i>
+                <h3 id="interstitial-title" class="text-xl font-bold mb-2">Anúncio</h3>
+                <p class="text-gray-600 dark:text-gray-300 text-sm">Aguarde ou feche para continuar. Seu apoio é importante!</p>
+            </div>
+            
+            <div class="h-60 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center mb-4">
+                <p class="text-gray-500 dark:text-gray-400">Simulação Anúncio Intersticial (AdMob)</p>
+            </div>
+            
+            <div class="flex justify-center">
+                 <button id="close-ad-btn" class="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors opacity-50 cursor-not-allowed" disabled>
+                    Fechar Anúncio (<span id="ad-timer">5</span>s)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container"></div>
+
+    <script>
+        // --- Polyfill for structuredClone (if needed for older browsers) ---
+        if (typeof structuredClone === 'undefined') {
+             window.structuredClone = (obj) => JSON.parse(JSON.stringify(obj));
+        }
+        
+        // --- Sample Data & Defaults (Replace with actual data fetching later) ---
+        const sampleNews = [
+            // ... (kept your sample data)
+             {
+                id: 1,
+                title: "Novo plano econômico é anunciado pelo governo federal",
+                description: "O governo anunciou hoje um novo pacote de medidas para impulsionar a economia brasileira, com foco em redução de impostos para pequenas empresas.",
+                category: "economia",
+                source: "g1",
+                date: "2023-06-15T10:30:00Z",
+                image: "https://source.unsplash.com/random/600x400/?economy",
+                url: "https://g1.globo.com/economia/noticia/2023/06/15/novo-plano-economico.ghtml"
+            },
+            {
+                id: 2,
+                title: "Seleção Brasileira vence amistoso contra Argentina",
+                description: "Em jogo emocionante, Brasil vence Argentina por 2 a 1 em preparação para a Copa do Mundo. Neymar marca gol decisivo nos acréscimos.",
+                category: "esportes",
+                source: "uol",
+                date: "2023-06-14T22:15:00Z",
+                image: "https://source.unsplash.com/random/600x400/?soccer",
+                url: "https://www.uol.com.br/esporte/futebol/ultimas-noticias/2023/06/14/brasil-argentina-amistoso.htm"
+            },
+            {
+                id: 3,
+                title: "Pesquisadores descobrem possível tratamento para Alzheimer",
+                description: "Cientistas anunciam avanço promissor no tratamento do Alzheimer com nova droga que reduziu em 60% o avanço da doença em testes clínicos.",
+                category: "saude",
+                source: "bbc",
+                date: "2023-06-14T18:45:00Z",
+                image: "https://source.unsplash.com/random/600x400/?health",
+                url: "https://www.bbc.com/news/health-12345678"
+            },
+             {
+                id: 4,
+                title: "Novo smartphone com tela dobrável é lançado no mercado",
+                description: "Fabricante coreana lança novo modelo de smartphone com tela dobrável e câmera de 200MP. Preço inicial será de US$ 1.500.",
+                category: "tecnologia",
+                source: "cnn",
+                date: "2023-06-13T14:20:00Z",
+                image: "https://source.unsplash.com/random/600x400/?smartphone",
+                url: "https://www.cnn.com/tech/new-foldable-phone"
+            },
+             {
+                id: 5,
+                title: "Festival de música atrai milhares no Rio de Janeiro",
+                description: "Mais de 100 mil pessoas compareceram ao primeiro dia do festival que reúne artistas nacionais e internacionais na capital fluminense.",
+                category: "entretenimento",
+                source: "g1",
+                date: "2023-06-12T09:10:00Z",
+                image: "https://source.unsplash.com/random/600x400/?music",
+                url: "https://g1.globo.com/rj/rio-de-janeiro/noticia/2023/06/12/festival-musica-rio.ghtml"
+            },
+             {
+                id: 6,
+                title: "Conflito na Ucrânia: novas negociações de paz são marcadas",
+                description: "Rússia e Ucrânia concordam em nova rodada de negociações após meses de impasse. Encontro será mediado pela ONU na próxima semana.",
+                category: "mundo",
+                source: "bbc",
+                date: "2023-06-11T16:30:00Z",
+                image: "https://source.unsplash.com/random/600x400/?ukraine",
+                url: "https://www.bbc.com/news/world-europe-12345678"
+            },
+             {
+                id: 7,
+                title: "Projeto de lei sobre educação é aprovado no Congresso",
+                description: "Depois de meses de debates, projeto que reforma o ensino médio é aprovado com ampla maioria. Mudanças devem começar no próximo ano letivo.",
+                category: "politica",
+                source: "uol",
+                date: "2023-06-10T12:45:00Z",
+                image: "https://source.unsplash.com/random/600x400/?school",
+                url: "https://www.uol.com.br/politica/ultimas-noticias/2023/06/10/projeto-educacao-aprovado.htm"
+            },
+             {
+                id: 8,
+                title: "Nova espécie de dinossauro é descoberta no Brasil",
+                description: "Paleontólogos brasileiros anunciam descoberta de fóssil de dinossauro carnívoro de 80 milhões de anos no interior do Ceará.",
+                category: "ciencia",
+                source: "g1",
+                date: "2023-06-09T11:20:00Z",
+                image: "https://source.unsplash.com/random/600x400/?dinosaur",
+                url: "https://g1.globo.com/ciencia/noticia/2023/06/09/nova-especie-dinossauro.ghtml"
+            },
+             {
+                id: 9,
+                title: "Inflação oficial fecha abaixo do esperado em maio",
+                description: "Índice de preços ao consumidor registra alta de 0,35% em maio, abaixo da previsão do mercado. Alimentos e transportes puxam desaceleração.",
+                category: "economia",
+                source: "cnn",
+                date: "2023-06-08T08:15:00Z",
+                image: "https://source.unsplash.com/random/600x400/?money",
+                url: "https://www.cnn.com/economy/inflation-may"
+            },
+             {
+                id: 10,
+                title: "Temporada de furacões no Atlântico começa com alertas",
+                description: "Primeira tempestade tropical da temporada se forma no Caribe. Especialistas preveem temporada mais intensa que a média este ano.",
+                category: "mundo",
+                source: "bbc",
+                date: "2023-06-07T15:40:00Z",
+                image: "https://source.unsplash.com/random/600x400/?hurricane",
+                url: "https://www.bbc.com/news/world-latin-america-12345678"
+            },
+             {
+                id: 11,
+                title: "Brasil registra recorde na geração de energia solar",
+                description: "Capacidade instalada de energia solar fotovoltaica no país ultrapassa 30 GW, com crescimento de 50% no último ano.",
+                category: "tecnologia",
+                source: "g1",
+                date: "2023-06-06T13:25:00Z",
+                image: "https://source.unsplash.com/random/600x400/?solar",
+                url: "https://g1.globo.com/economia/noticia/2023/06/06/energia-solar-recorde.ghtml"
+            },
+             {
+                id: 12,
+                title: "Novo tratamento para câncer de mama mostra eficácia",
+                description: "Estudo internacional com participação brasileira mostra que nova terapia aumenta sobrevida em casos avançados de câncer de mama.",
+                category: "saude",
+                source: "uol",
+                date: "2023-06-05T10:50:00Z",
+                image: "https://source.unsplash.com/random/600x400/?hospital",
+                url: "https://www.uol.com.br/vivabem/ultimas-noticias/2023/06/05/tratamento-cancer-mama.htm"
+            }
+        ];
+
+        const defaultRssFeeds = [
+            { id: 1, name: "G1 Brasil", url: "https://g1.globo.com/rss/g1/brasil/", category: "brasil", active: true },
+            { id: 2, name: "UOL Últimas Notícias", url: "https://noticias.uol.com.br/ultimas-noticias/rss.xml", category: "brasil", active: true },
+            { id: 3, name: "Folha de S.Paulo", url: "https://feeds.folha.uol.com.br/emcimadahora/rss091.xml", category: "brasil", active: true },
+            { id: 4, name: "Estadão", url: "https://www.estadao.com.br/feed/", category: "brasil", active: true },
+            { id: 5, name: "CNN Brasil", url: "https://www.cnnbrasil.com.br/feed/", category: "brasil", active: true },
+            { id: 6, name: "BBC Mundo", url: "https://feeds.bbci.co.uk/news/world/rss.xml", category: "mundo", active: true },
+            { id: 7, name: "CNN Internacional", url: "http://rss.cnn.com/rss/edition.rss", category: "mundo", active: true },
+            { id: 8, name: "Exame Economia", url: "https://exame.com/feed/", category: "economia", active: true },
+            { id: 9, name: "Valor Econômico", url: "https://valor.globo.com/rss/valor", category: "economia", active: true },
+            { id: 10, name: "Olhar Digital", url: "https://olhardigital.com.br/feed/", category: "tecnologia", active: true },
+            { id: 11, name: "TechCrunch", url: "https://techcrunch.com/feed/", category: "tecnologia", active: true },
+            { id: 12, name: "Globo Esporte", url: "https://ge.globo.com/rss/ge/", category: "esportes", active: true },
+            { id: 13, name: "ESPN Brasil", url: "https://www.espn.com.br/rss", category: "esportes", active: true },
+            { id: 14, name: "BBC Brasil", url: "https://www.bbc.com/portuguese/index.xml", category: "brasil", active: true },
+            { id: 15, name: "The Guardian", url: "https://www.theguardian.com/international/rss", category: "mundo", active: true }
+            // Add other default feeds here if needed
+        ];
+
+        const defaultCategoryFallbackImages = {
+            global: "https://via.placeholder.com/600x400/cccccc/969696.png?text=Sem+Imagem",
+            brasil: "https://source.unsplash.com/random/600x400/?brazil",
+            mundo: "https://source.unsplash.com/random/600x400/?world",
+            politica: "https://source.unsplash.com/random/600x400/?politics",
+            economia: "https://source.unsplash.com/random/600x400/?economy",
+            tecnologia: "https://source.unsplash.com/random/600x400/?technology",
+            esportes: "https://source.unsplash.com/random/600x400/?sports",
+            saude: "https://source.unsplash.com/random/600x400/?health",
+            entretenimento: "https://source.unsplash.com/random/600x400/?entertainment",
+            ciencia: "https://source.unsplash.com/random/600x400/?science"
+        };
+
+        const defaultAdmobSettings = {
+            appId: 'ca-app-pub-3940256099942544~3347511713', // Example App ID
+            bannerId: 'ca-app-pub-3940256099942544/9214589741',
+            fixedBannerId: 'ca-app-pub-3940256099942544/6300978111',
+            interstitialId: 'ca-app-pub-3940256099942544/1033173712',
+            rewardedId: 'ca-app-pub-3940256099942544/5224354917',
+            rewardedInterstitialId: 'ca-app-pub-3940256099942544/5354046379',
+            nativeId: 'ca-app-pub-3940256099942544/2247696110',
+            nativeVideoId: 'ca-app-pub-3940256099942544/1044960115'
+        };
+        
+        const defaultAppSettings = {
+            defaultTheme: 'system',
+            itemsPerPage: 12,
+            showAds: true,
+            adFrequency: 'medium' // 'low', 'medium', 'high'
+        };
+
+        // --- Source Names Mapping ---
+         const sourceNames = {
+            g1: "G1",
+            uol: "UOL",
+            bbc: "BBC",
+            cnn: "CNN",
+            folha: "Folha", // Shorter name
+            estadao: "Estadão",
+            exame: "Exame",
+            valor: "Valor",
+            olhardigital: "Olhar Digital",
+            techcrunch: "TechCrunch",
+            ge: "Globo Esporte",
+            espn: "ESPN",
+            guardian: "The Guardian",
+            r7: "R7",
+            veja: "Veja",
+            lance: "Lance!"
+            // Add more as needed based on actual feed sources
+        };
+        
+        // --- DOM Elements ---
+        const themeToggle = document.getElementById('theme-toggle');
+        const refreshBtn = document.getElementById('refresh-btn');
+        const settingsBtn = document.getElementById('settings-btn');
+        const closeSettingsBtn = document.getElementById('close-settings-btn');
+        const settingsPanel = document.getElementById('settings-panel');
+        const filterBtn = document.getElementById('filter-btn');
+        const closeFilterBtn = document.getElementById('close-filter-btn');
+        const filterDropdown = document.getElementById('filter-dropdown');
+        const searchInput = document.getElementById('search-input');
+        const categoryBtns = document.querySelectorAll('.category-btn');
+        const mobileCategorySelect = document.getElementById('mobile-category-select');
+        // const mobileSourceSelect = document.getElementById('mobile-source-select'); // Source filter commented out for now
+        const applyFilterBtn = document.getElementById('apply-filter-btn');
+        const loadingSkeleton = document.getElementById('loading-skeleton');
+        const newsGrid = document.getElementById('news-grid');
+        const loadMoreContainer = document.getElementById('load-more-container');
+        const loadMoreBtn = document.getElementById('load-more-btn');
+        const noResults = document.getElementById('no-results');
+        const newsModal = document.getElementById('news-modal');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+        const modalTitle = document.getElementById('modal-title');
+        const modalDate = document.getElementById('modal-date');
+        const modalImage = document.getElementById('modal-image');
+        const modalImageContainer = document.getElementById('modal-image-container');
+        const modalContent = document.getElementById('modal-content');
+        const modalCategory = document.getElementById('modal-category');
+        const modalSource = document.getElementById('modal-source');
+        const fullArticleBtn = document.getElementById('full-article-btn');
+        const speakBtn = document.getElementById('speak-btn');
+        const shareBtn = document.getElementById('share-btn');
+        const interstitialAd = document.getElementById('interstitial-ad');
+        const closeAdBtn = document.getElementById('close-ad-btn');
+        const forceCloseAdBtn = document.getElementById('force-close-ad-btn');
+        const adTimer = document.getElementById('ad-timer');
+        const toastContainer = document.getElementById('toast-container');
+        const simBannerId = document.getElementById('sim-banner-id');
+        
+        // Admin elements
+        const adminLoginSection = document.getElementById('admin-login-section');
+        const loginForm = document.getElementById('login-form');
+        const adminControls = document.getElementById('admin-controls');
+        const adminUsername = document.getElementById('admin-username');
+        const adminPassword = document.getElementById('admin-password');
+        const loginBtn = document.getElementById('login-btn');
+        const logoutBtn = document.getElementById('logout-btn');
+        
+        // RSS Management elements
+        const rssManagementSection = document.getElementById('rss-management-section');
+        const addFeedBtn = document.getElementById('add-feed-btn');
+        const addFeedForm = document.getElementById('add-feed-form');
+        const editingFeedId = document.getElementById('editing-feed-id');
+        const newFeedName = document.getElementById('new-feed-name');
+        const newFeedUrl = document.getElementById('new-feed-url');
+        const newFeedCategory = document.getElementById('new-feed-category');
+        const saveFeedBtn = document.getElementById('save-feed-btn');
+        const cancelFeedBtn = document.getElementById('cancel-feed-btn');
+        const rssFeedsList = document.getElementById('rss-feeds-list');
+        
+        // Fallback Images elements
+        const fallbackImagesSection = document.getElementById('fallback-images-section');
+        const globalFallbackImage = document.getElementById('global-fallback-image');
+        const saveGlobalFallback = document.getElementById('save-global-fallback');
+        const currentGlobalFallbackUrl = document.getElementById('current-global-fallback-url');
+        const categoryImagesList = document.getElementById('category-images-list');
+        const saveCategoryFallbacks = document.getElementById('save-category-fallbacks');
+        
+        // App Settings elements
+        const defaultThemeSelect = document.getElementById('default-theme');
+        const itemsPerPageSelect = document.getElementById('items-per-page');
+        const showAdsToggle = document.getElementById('show-ads-toggle');
+        const adFrequencySelect = document.getElementById('ad-frequency');
+        const saveAppSettings = document.getElementById('save-app-settings');
+        
+        // AdMob Settings elements
+        const admobSettingsSection = document.getElementById('admob-settings-section');
+        const admobAppIdInput = document.getElementById('admob-app-id');
+        const admobBannerIdInput = document.getElementById('admob-banner-id');
+        const admobFixedBannerIdInput = document.getElementById('admob-fixed-banner-id');
+        const admobInterstitialIdInput = document.getElementById('admob-interstitial-id');
+        const admobRewardedIdInput = document.getElementById('admob-rewarded-id');
+        const admobRewardedInterstitialIdInput = document.getElementById('admob-rewarded-interstitial-id');
+        const admobNativeIdInput = document.getElementById('admob-native-id');
+        const admobNativeVideoIdInput = document.getElementById('admob-native-video-id');
+        const saveAdmobSettings = document.getElementById('save-admob-settings');
+
+        // --- App State ---
+        let allNews = []; // Holds all fetched news (simulation)
+        let filteredNews = []; // News currently being displayed after filters
+        let currentCategory = 'all';
+        let currentSource = 'all'; // Source filtering currently disabled in UI
+        let currentSearch = '';
+        let displayedCount = 12; // Initial number of items to show
+        let itemsPerLoad = 12; // Number of items to load with "Load More"
+        let clickCount = 0;
+        let adClickThreshold = 10; // Clicks needed to trigger interstitial
+        let speechSynthesis = window.speechSynthesis;
+        let utterance = null;
+        let isAdmin = false;
+        let rssFeeds = [];
+        let categoryFallbackImages = {};
+        let appSettings = {};
+        let admobSettings = {};
+        let interstitialTimer = null;
+        let newsItemToOpenAfterAd = null;
+
+        // --- Initialization ---
+        function init() {
+            loadSettings();
+            loadRssFeeds();
+            loadFallbackImages();
+            loadAdmobSettings(); // Load AdMob settings
+
+            itemsPerLoad = parseInt(appSettings.itemsPerPage) || 12;
+            displayedCount = itemsPerLoad;
+            updateAdClickThreshold(); // Set threshold based on frequency
+
+            // Load news (replace with actual API call)
+            loadNews();
+            
+            setupEventListeners();
+            checkThemePreference();
+            updateUIBasedOnSettings();
+            updateSimulatedAdIds();
+        }
+
+        // --- Data Loading & Saving (localStorage) ---
+        function loadSettings() {
+            try {
+                const savedSettings = localStorage.getItem('newsFlowSettings');
+                appSettings = savedSettings ? JSON.parse(savedSettings) : structuredClone(defaultAppSettings);
+            } catch (e) {
+                console.error("Error loading app settings:", e);
+                appSettings = structuredClone(defaultAppSettings);
+            }
+        }
+
+        function saveAppSettingsToStorage() {
+            try {
+                localStorage.setItem('newsFlowSettings', JSON.stringify(appSettings));
+            } catch (e) {
+                console.error("Error saving app settings:", e);
+                 showToast('Erro ao salvar configurações gerais', 'error');
+            }
+        }
+
+        function loadRssFeeds() {
+             try {
+                const savedFeeds = localStorage.getItem('newsFlowRssFeeds');
+                rssFeeds = savedFeeds ? JSON.parse(savedFeeds) : structuredClone(defaultRssFeeds);
+            } catch (e) {
+                console.error("Error loading RSS feeds:", e);
+                rssFeeds = structuredClone(defaultRssFeeds);
+                 showToast('Erro ao carregar feeds RSS', 'error');
+            }
+        }
+
+        function saveRssFeeds() {
+             try {
+                localStorage.setItem('newsFlowRssFeeds', JSON.stringify(rssFeeds));
+            } catch (e) {
+                console.error("Error saving RSS feeds:", e);
+                 showToast('Erro ao salvar feeds RSS', 'error');
+            }
+        }
+
+        function loadFallbackImages() {
+            try {
+                const savedImages = localStorage.getItem('newsFlowFallbackImages');
+                categoryFallbackImages = savedImages ? JSON.parse(savedImages) : structuredClone(defaultCategoryFallbackImages);
+            } catch (e) {
+                console.error("Error loading fallback images:", e);
+                categoryFallbackImages = structuredClone(defaultCategoryFallbackImages);
+                 showToast('Erro ao carregar imagens padrão', 'error');
+            }
+            globalFallbackImage.value = categoryFallbackImages.global || '';
+            currentGlobalFallbackUrl.textContent = categoryFallbackImages.global || 'Nenhuma definida';
+        }
+
+        function saveFallbackImages() {
+            try {
+                localStorage.setItem('newsFlowFallbackImages', JSON.stringify(categoryFallbackImages));
+            } catch (e) {
+                console.error("Error saving fallback images:", e);
+                 showToast('Erro ao salvar imagens padrão', 'error');
+            }
+        }
+        
+        function loadAdmobSettings() {
+             try {
+                const savedAdmob = localStorage.getItem('newsFlowAdmobSettings');
+                admobSettings = savedAdmob ? JSON.parse(savedAdmob) : structuredClone(defaultAdmobSettings);
+            } catch (e) {
+                console.error("Error loading AdMob settings:", e);
+                admobSettings = structuredClone(defaultAdmobSettings);
+                showToast('Erro ao carregar configurações AdMob', 'error');
+            }
+        }
+
+        function saveAdmobSettingsToStorage() {
+            try {
+                localStorage.setItem('newsFlowAdmobSettings', JSON.stringify(admobSettings));
+            } catch (e) {
+                console.error("Error saving AdMob settings:", e);
+                showToast('Erro ao salvar configurações AdMob', 'error');
+            }
+        }
+
+        // --- Core App Logic ---
+        function loadNews() {
+            console.log("Loading news...");
+            loadingSkeleton.classList.remove('hidden');
+            newsGrid.classList.add('hidden');
+            noResults.classList.add('hidden');
+            
+            // --- SIMULATION ---
+            // Replace this with actual RSS fetching from backend (Supabase Functions)
+            // The backend should fetch from active feeds, parse, deduplicate, sort, and return news items.
+            setTimeout(() => {
+                allNews = structuredClone(sampleNews).sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort by date descending
+                filterNews(); // Apply initial filters
+                
+                loadingSkeleton.classList.add('hidden');
+                newsGrid.classList.remove('hidden');
+                
+                updateLoadMoreButton();
+                console.log("News loaded (simulated).");
+            }, 1000); 
+        }
+
+        function renderNews() {
+            newsGrid.innerHTML = '';
+            const newsToDisplay = filteredNews.slice(0, displayedCount);
+            
+            if (newsToDisplay.length === 0) {
+                noResults.classList.remove('hidden');
+                newsGrid.classList.add('hidden');
+                return;
+            }
+            
+            noResults.classList.add('hidden');
+            newsGrid.classList.remove('hidden');
+            
+            let newsIndex = 0;
+            newsToDisplay.forEach((news) => {
+                 // Insert ad card based on settings (e.g., every 7 news items)
+                 // AdMob Native Ads integration would replace this.
+                 if (appSettings.showAds && newsIndex > 0 && newsIndex % 7 === 0) {
+                    newsGrid.appendChild(createAdCard());
+                }
+                
+                newsGrid.appendChild(createNewsCard(news));
+                newsIndex++;
+            });
+            
+            updateLoadMoreButton();
+        }
+
+        function createNewsCard(news) {
+            const card = document.createElement('div');
+            card.className = 'bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden transition-all duration-300 card-hover hover:shadow-lg fade-in cursor-pointer';
+            card.dataset.id = news.id; // Use a unique ID from the actual news item
+            
+            const date = new Date(news.date);
+            const formattedDate = date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
+            
+            const imageUrl = news.image || categoryFallbackImages[news.category] || categoryFallbackImages.global;
+            const sourceDisplayName = sourceNames[news.source?.toLowerCase()] || news.source || 'Desconhecida';
+            
+            card.innerHTML = `
+                <div class="h-48 overflow-hidden relative">
+                    <img src="${imageUrl}" alt="${news.title}" loading="lazy" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='${categoryFallbackImages.global}';">
+                     <span class="absolute top-2 left-2 inline-block px-2 py-1 text-xs font-semibold rounded-full ${getCategoryColorClass(news.category)} shadow-sm">${formatCategoryName(news.category)}</span>
+                </div>
+                <div class="p-4 flex flex-col justify-between" style="min-height: 160px;"> 
+                    <div>
+                        <h3 class="font-bold text-lg mb-2 line-clamp-2" title="${news.title}">${news.title}</h3>
+                        <p class="text-gray-600 dark:text-gray-300 text-sm mb-3 line-clamp-3">${news.description}</p>
+                    </div>
+                    <div class="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400 mt-auto pt-2 border-t border-gray-100 dark:border-gray-700">
+                        <span><i class="fas fa-clock mr-1"></i> ${formattedDate}</span>
+                        <span class="font-medium"><i class="fas fa-globe-americas mr-1"></i> ${sourceDisplayName}</span>
+                    </div>
+                </div>
+            `;
+            
+            card.addEventListener('click', () => handleNewsCardClick(news));
+            
+            return card;
+        }
+        
+         function createAdCard() {
+            // --- SIMULATION ---
+            // This should be replaced by Google AdMob Native Ad SDK integration
+            const adCard = document.createElement('div');
+            adCard.className = 'bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden fade-in border border-dashed border-gray-300 dark:border-gray-600';
+            
+            adCard.innerHTML = `
+                <div class="p-4">
+                    <div class="flex items-center mb-2">
+                        <span class="inline-block px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300">Publicidade</span>
+                    </div>
+                    <div class="h-32 bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center mb-3">
+                        <p class="text-gray-500 dark:text-gray-400 text-sm">Anúncio Nativo (AdMob ID: <span class="font-mono text-xs">${admobSettings.nativeId || 'N/A'}</span>)</p>
+                    </div>
+                    <h3 class="font-semibold text-md mb-1">Conteúdo Patrocinado</h3>
+                    <p class="text-gray-600 dark:text-gray-300 text-xs">Seu clique ajuda a manter este serviço gratuito.</p>
+                </div>
+            `;
+            return adCard;
+        }
+
+        function filterNews() {
+            console.log(`Filtering: Category='${currentCategory}', Search='${currentSearch}'`);
+            filteredNews = allNews.filter(news => {
+                const categoryMatch = currentCategory === 'all' || news.category === currentCategory;
+                const searchMatch = !currentSearch || 
+                                    news.title.toLowerCase().includes(currentSearch) || 
+                                    news.description.toLowerCase().includes(currentSearch);
+                // Add source filter here if implemented
+                return categoryMatch && searchMatch;
+            });
+            
+            // Reset display count and render
+            displayedCount = itemsPerLoad; 
+            renderNews();
+        }
+
+        function updateLoadMoreButton() {
+            if (filteredNews.length > displayedCount) {
+                loadMoreContainer.classList.remove('hidden');
+            } else {
+                loadMoreContainer.classList.add('hidden');
+            }
+        }
+        
+        function handleNewsCardClick(news) {
+             incrementClickCount();
+            
+            if (appSettings.showAds && clickCount >= adClickThreshold) {
+                console.log("Ad threshold reached. Showing interstitial.");
+                newsItemToOpenAfterAd = news; // Store the news item
+                showInterstitialAd();
+                clickCount = 0; // Reset counter after showing ad
+            } else {
+                 console.log("Opening modal directly.");
+                openNewsModal(news);
+            }
+        }
+
+        function openNewsModal(news) {
+             if (!news) {
+                console.error("Attempted to open modal with invalid news data.");
+                return;
+            }
+            console.log("Opening modal for:", news.title);
+            
+            const date = new Date(news.date);
+            const formattedDate = date.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            const imageUrl = news.image || categoryFallbackImages[news.category] || categoryFallbackImages.global;
+             const sourceDisplayName = sourceNames[news.source?.toLowerCase()] || news.source || 'Desconhecida';
+
+            modalTitle.textContent = news.title;
+            modalDate.textContent = `Publicado em ${formattedDate}`;
+            modalImage.src = imageUrl;
+            modalImage.alt = news.title;
+            modalImage.onerror = () => { modalImage.src = categoryFallbackImages.global; }; // Fallback for modal image too
+            modalContent.innerHTML = `<p>${news.description}</p>`; // Use description, actual RSS might have more content
+            modalCategory.textContent = formatCategoryName(news.category);
+            modalCategory.className = `inline-block px-2 py-1 text-xs font-medium rounded-full ${getCategoryColorClass(news.category)}`;
+            modalSource.textContent = sourceDisplayName;
+            fullArticleBtn.href = news.url;
+            
+            // Store data for speak/share
+            speakBtn.dataset.text = `${news.title}. ${news.description}`;
+            shareBtn.dataset.url = news.url;
+            shareBtn.dataset.title = news.title;
+
+            newsModal.classList.remove('hidden');
+            document.body.style.overflow = 'hidden'; // Prevent background scroll
+        }
+
+        function closeNewsModal() {
+            newsModal.classList.add('hidden');
+            document.body.style.overflow = 'auto';
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+             // Clear potentially stored data
+            speakBtn.dataset.text = "";
+            shareBtn.dataset.url = "";
+            shareBtn.dataset.title = "";
+        }
+        
+        function showInterstitialAd() {
+            // --- SIMULATION ---
+            // Replace with AdMob Interstitial SDK call
+             if (!appSettings.showAds) return; // Don't show if disabled
+            
+            console.log("Showing Interstitial Ad (Simulation)");
+            interstitialAd.classList.remove('hidden');
+            document.body.style.overflow = 'hidden'; // Prevent background scroll
+
+            let seconds = 5;
+            adTimer.textContent = seconds;
+            closeAdBtn.disabled = true;
+            closeAdBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+            // Clear any previous timer
+            if (interstitialTimer) clearInterval(interstitialTimer);
+
+            interstitialTimer = setInterval(() => {
+                seconds--;
+                adTimer.textContent = seconds;
+                if (seconds <= 0) {
+                    clearInterval(interstitialTimer);
+                    interstitialTimer = null;
+                    closeAdBtn.disabled = false;
+                    closeAdBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    closeAdBtn.textContent = "Fechar Anúncio";
+                }
+            }, 1000);
+        }
+
+        function closeInterstitialAd(openStoredNews = true) {
+            console.log("Closing Interstitial Ad");
+            interstitialAd.classList.add('hidden');
+             if (interstitialTimer) {
+                clearInterval(interstitialTimer);
+                 interstitialTimer = null;
+            }
+            
+             // Only restore body scroll if the news modal isn't immediately opening
+            if (!openStoredNews || !newsItemToOpenAfterAd) {
+                 document.body.style.overflow = 'auto';
+            }
+
+             // Open the news item that triggered the ad, if requested and available
+            if (openStoredNews && newsItemToOpenAfterAd) {
+                console.log("Opening stored news item after ad close.");
+                openNewsModal(newsItemToOpenAfterAd);
+            }
+             newsItemToOpenAfterAd = null; // Clear the stored item
+             
+             // Reset button state for next time
+             closeAdBtn.textContent = `Fechar Anúncio (${5}s)`; 
+        }
+
+        function incrementClickCount() {
+            clickCount++;
+            console.log("Click count:", clickCount);
+        }
+        
+        function updateAdClickThreshold() {
+             switch (appSettings.adFrequency) {
+                case 'low': adClickThreshold = 15; break;
+                case 'high': adClickThreshold = 5; break;
+                case 'medium': 
+                default: adClickThreshold = 10; break;
+            }
+            console.log("Ad frequency set to:", appSettings.adFrequency, "Threshold:", adClickThreshold);
+        }
+
+        // --- UI Helpers ---
+        function formatCategoryName(category) {
+            if (!category) return 'Geral';
+            const names = {
+                brasil: 'Brasil', mundo: 'Mundo', politica: 'Política', economia: 'Economia',
+                tecnologia: 'Tecnologia', esportes: 'Esportes', saude: 'Saúde',
+                entretenimento: 'Entretenimento', ciencia: 'Ciência'
+            };
+            return names[category.toLowerCase()] || category.charAt(0).toUpperCase() + category.slice(1);
+        }
+
+        function getCategoryColorClass(category) {
+             if (!category) return 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300';
+             const catLower = category.toLowerCase();
+             if (catLower === 'brasil') return 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300';
+             if (catLower === 'mundo') return 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300';
+             if (catLower === 'politica') return 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300';
+             if (catLower === 'economia') return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300';
+             if (catLower === 'tecnologia') return 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300';
+             if (catLower === 'esportes') return 'bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300';
+             if (catLower === 'saude') return 'bg-pink-100 dark:bg-pink-900 text-pink-700 dark:text-pink-300';
+             if (catLower === 'entretenimento') return 'bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300';
+             if (catLower === 'ciencia') return 'bg-cyan-100 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-300';
+             return 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300';
+        }
+
+        function checkThemePreference() {
+            const savedTheme = localStorage.getItem('theme') || appSettings.defaultTheme || 'system';
+            applyTheme(savedTheme);
+        }
+
+        function applyTheme(theme) {
+             if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        }
+        
+         function updateUIBasedOnSettings() {
+            // Update settings panel inputs to reflect current settings
+            defaultThemeSelect.value = appSettings.defaultTheme;
+            itemsPerPageSelect.value = appSettings.itemsPerPage.toString();
+            showAdsToggle.checked = appSettings.showAds;
+            adFrequencySelect.value = appSettings.adFrequency;
+            
+            // Update AdMob inputs
+            admobAppIdInput.value = admobSettings.appId || '';
+            admobBannerIdInput.value = admobSettings.bannerId || '';
+            admobFixedBannerIdInput.value = admobSettings.fixedBannerId || '';
+            admobInterstitialIdInput.value = admobSettings.interstitialId || '';
+            admobRewardedIdInput.value = admobSettings.rewardedId || '';
+            admobRewardedInterstitialIdInput.value = admobSettings.rewardedInterstitialId || '';
+            admobNativeIdInput.value = admobSettings.nativeId || '';
+            admobNativeVideoIdInput.value = admobSettings.nativeVideoId || '';
+        }
+
+        function updateSimulatedAdIds() {
+             // Update placeholder IDs in the UI simulations
+            simBannerId.textContent = admobSettings.bannerId || 'N/A';
+            // Update other placeholders if needed
+        }
+
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.textContent = message;
+            
+            toastContainer.appendChild(toast);
+            
+            // Remove toast after animation finishes
+            setTimeout(() => {
+                 if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 3000); // Match CSS animation duration + display time
+        }
+
+        // --- Settings Panel Logic ---
+        function openSettingsPanel() {
+            settingsPanel.classList.remove('hidden');
+            settingsPanel.querySelector('div').classList.remove('translate-x-full');
+            // Load current settings into the form fields when opening
+            updateUIBasedOnSettings();
+            if (isAdmin) {
+                loadRssFeedsList();
+                loadCategoryImagesList();
+            }
+        }
+
+        function closeSettingsPanel() {
+            settingsPanel.querySelector('div').classList.add('translate-x-full');
+            setTimeout(() => settingsPanel.classList.add('hidden'), 300);
+        }
+
+        function openFilterDropdown() {
+            // Pre-select current category
+            mobileCategorySelect.value = currentCategory;
+            // Pre-select current source if implemented
+            // mobileSourceSelect.value = currentSource; 
+            filterDropdown.classList.remove('hidden');
+            filterDropdown.querySelector('div').classList.remove('translate-y-full');
+        }
+
+        function closeFilterDropdown() {
+            filterDropdown.querySelector('div').classList.add('translate-y-full');
+            setTimeout(() => filterDropdown.classList.add('hidden'), 300);
+        }
+
+        function applyMobileFilters() {
+            const newCategory = mobileCategorySelect.value;
+            // const newSource = mobileSourceSelect.value; // Uncomment if source filtering is added
+            
+            if (newCategory !== currentCategory /* || newSource !== currentSource */) {
+                currentCategory = newCategory;
+                // currentSource = newSource;
+                
+                // Update desktop category buttons to match
+                categoryBtns.forEach(btn => {
+                    if (btn.dataset.category === currentCategory) {
+                        btn.classList.add('bg-primary-100', 'dark:bg-primary-900', 'text-primary-700', 'dark:text-primary-300');
+                        btn.classList.remove('bg-gray-100', 'dark:bg-gray-700');
+                    } else {
+                        btn.classList.remove('bg-primary-100', 'dark:bg-primary-900', 'text-primary-700', 'dark:text-primary-300');
+                        btn.classList.add('bg-gray-100', 'dark:bg-gray-700');
+                    }
+                });
+                
+                filterNews();
+            }
+            closeFilterDropdown();
+        }
+        
+        function handleSaveAppSettings() {
+            appSettings.defaultTheme = defaultThemeSelect.value;
+            appSettings.itemsPerPage = parseInt(itemsPerPageSelect.value) || 12;
+            appSettings.showAds = showAdsToggle.checked;
+            appSettings.adFrequency = adFrequencySelect.value;
+            
+            itemsPerLoad = appSettings.itemsPerPage; // Update items per load
+            updateAdClickThreshold(); // Update ad frequency threshold
+            
+            saveAppSettingsToStorage();
+            checkThemePreference(); // Apply theme immediately if changed
+            showToast('Configurações gerais salvas!', 'success');
+            
+            // Optionally re-render if items per page changed drastically
+            if (displayedCount !== appSettings.itemsPerPage) {
+                displayedCount = appSettings.itemsPerPage;
+                renderNews();
+            }
+        }
+
+        function handleSaveAdmobSettings() {
+            admobSettings.appId = admobAppIdInput.value.trim();
+            admobSettings.bannerId = admobBannerIdInput.value.trim();
+            admobSettings.fixedBannerId = admobFixedBannerIdInput.value.trim();
+            admobSettings.interstitialId = admobInterstitialIdInput.value.trim();
+            admobSettings.rewardedId = admobRewardedIdInput.value.trim();
+            admobSettings.rewardedInterstitialId = admobRewardedInterstitialIdInput.value.trim();
+            admobSettings.nativeId = admobNativeIdInput.value.trim();
+            admobSettings.nativeVideoId = admobNativeVideoIdInput.value.trim();
+            
+            saveAdmobSettingsToStorage();
+            updateSimulatedAdIds();
+            showToast('Configurações AdMob salvas!', 'success');
+        }
+        
+        function handleSaveGlobalFallback() {
+             const url = globalFallbackImage.value.trim();
+            categoryFallbackImages.global = url || defaultCategoryFallbackImages.global; // Use default if empty
+            saveFallbackImages();
+            globalFallbackImage.value = categoryFallbackImages.global; // Update input field
+            currentGlobalFallbackUrl.textContent = categoryFallbackImages.global;
+             showToast('Imagem global padrão salva!', 'success');
+             // Re-render might be needed if many images were using the old global fallback
+             renderNews(); 
+        }
+        
+        function handleSaveCategoryFallbacks() {
+            const inputs = categoryImagesList.querySelectorAll('input[data-category]');
+            let changed = false;
+            inputs.forEach(input => {
+                const category = input.dataset.category;
+                const url = input.value.trim();
+                 if (url && categoryFallbackImages[category] !== url) {
+                     categoryFallbackImages[category] = url;
+                    changed = true;
+                } else if (!url && categoryFallbackImages[category]) {
+                    // If cleared, remove the specific category fallback (will use global)
+                    delete categoryFallbackImages[category];
+                    changed = true;
+                }
+            });
+            
+            if(changed) {
+                saveFallbackImages();
+                showToast('Imagens de categoria salvas!', 'success');
+                 renderNews(); // Re-render as image sources might have changed
+            } else {
+                showToast('Nenhuma alteração nas imagens de categoria.', 'info');
+            }
+        }
+
+        // --- Admin Specific Logic ---
+        function adminLogin() {
+            // !!! WARNING: INSECURE - FOR DEMO ONLY !!!
+            // Replace with a proper backend authentication system (e.g., Supabase Auth)
+            const username = adminUsername.value.trim();
+            const password = adminPassword.value.trim();
+            
+            if (username === 'admin' && password === 'admin123') {
+                isAdmin = true;
+                loginForm.classList.add('hidden');
+                adminControls.classList.remove('hidden');
+                rssManagementSection.classList.remove('hidden');
+                fallbackImagesSection.classList.remove('hidden');
+                admobSettingsSection.classList.remove('hidden');
+                
+                loadRssFeedsList();
+                loadCategoryImagesList();
+                adminPassword.value = ''; // Clear password field
+                showToast('Login administrativo bem-sucedido!', 'success');
+            } else {
+                isAdmin = false; // Ensure state is correct on failure
+                showToast('Usuário ou senha inválidos', 'error');
+            }
+        }
+
+        function adminLogout() {
+            isAdmin = false;
+            loginForm.classList.remove('hidden');
+            adminControls.classList.add('hidden');
+            rssManagementSection.classList.add('hidden');
+            fallbackImagesSection.classList.add('hidden');
+            admobSettingsSection.classList.add('hidden');
+            
+            adminUsername.value = '';
+            adminPassword.value = '';
+            showToast('Logout realizado', 'success');
+        }
+
+        function loadRssFeedsList() {
+             if (!isAdmin) return;
+            rssFeedsList.innerHTML = ''; // Clear previous list
+            
+            if (rssFeeds.length === 0) {
+                rssFeedsList.innerHTML = `<div class="p-4 text-center text-gray-500">Nenhum feed RSS cadastrado.</div>`;
+                return;
+            }
+
+            const listContainer = document.createElement('div');
+            listContainer.className = 'divide-y divide-gray-200 dark:divide-gray-700';
+
+            rssFeeds.forEach(feed => {
+                const item = document.createElement('div');
+                item.className = 'p-3 flex items-center justify-between space-x-2';
+                item.dataset.id = feed.id;
+
+                item.innerHTML = `
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between">
+                             <h4 class="font-medium truncate flex items-center ${feed.active ? '' : 'text-gray-400 dark:text-gray-500 line-through'}">
+                                 <i class="fas fa-circle text-xs mr-2 ${feed.active ? 'text-green-500' : 'text-gray-400'}"></i>
+                                ${feed.name}
+                             </h4>
+                             <span class="inline-block px-2 py-0.5 ml-2 text-xs font-medium rounded-full ${getCategoryColorClass(feed.category)}">${formatCategoryName(feed.category)}</span>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">${feed.url}</p>
+                    </div>
+                    <div class="flex space-x-1 text-xs">
+                        <button class="edit-feed-btn p-1 text-blue-600 hover:text-blue-800" aria-label="Editar feed ${feed.name}"> <i class="fas fa-edit"></i> </button>
+                        <button class="toggle-feed-btn p-1 ${feed.active ? 'text-yellow-600 hover:text-yellow-800' : 'text-green-600 hover:text-green-800'}" aria-label="${feed.active ? 'Desativar' : 'Ativar'} feed ${feed.name}"> <i class="fas ${feed.active ? 'fa-toggle-off' : 'fa-toggle-on'}"></i> </button>
+                        <button class="delete-feed-btn p-1 text-red-600 hover:text-red-800" aria-label="Excluir feed ${feed.name}"> <i class="fas fa-trash-alt"></i> </button>
+                    </div>
+                `;
+                
+                 // Add event listeners for buttons within the loop
+                 item.querySelector('.edit-feed-btn').addEventListener('click', () => editFeed(feed.id));
+                 item.querySelector('.toggle-feed-btn').addEventListener('click', () => toggleFeed(feed.id));
+                 item.querySelector('.delete-feed-btn').addEventListener('click', () => deleteFeed(feed.id));
+
+                listContainer.appendChild(item);
+            });
+            rssFeedsList.appendChild(listContainer);
+        }
+
+        function loadCategoryImagesList() {
+            if (!isAdmin) return;
+             categoryImagesList.innerHTML = ''; // Clear previous
+            const categories = ['brasil', 'mundo', 'politica', 'economia', 'tecnologia', 'esportes', 'saude', 'entretenimento', 'ciencia']; // Ensure all are listed
+
+            categories.forEach(category => {
+                const div = document.createElement('div');
+                 div.className = 'flex items-center space-x-2';
+                div.innerHTML = `
+                    <label for="cat-img-${category}" class="w-28 text-sm font-medium text-right pr-2">${formatCategoryName(category)}:</label>
+                    <input type="url" id="cat-img-${category}" data-category="${category}" 
+                           placeholder="URL da imagem para ${formatCategoryName(category)}" 
+                           value="${categoryFallbackImages[category] || ''}"
+                           class="flex-1 p-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
+                `;
+                 categoryImagesList.appendChild(div);
+            });
+        }
+        
+        function showAddFeedForm(feedToEdit = null) {
+            if (feedToEdit) {
+                editingFeedId.value = feedToEdit.id;
+                newFeedName.value = feedToEdit.name;
+                newFeedUrl.value = feedToEdit.url;
+                newFeedCategory.value = feedToEdit.category;
+                saveFeedBtn.textContent = "Atualizar";
+            } else {
+                editingFeedId.value = '';
+                newFeedName.value = '';
+                newFeedUrl.value = '';
+                newFeedCategory.value = 'brasil'; // Default category
+                saveFeedBtn.textContent = "Salvar";
+            }
+            addFeedForm.classList.remove('hidden');
+        }
+        
+        function hideAddFeedForm() {
+             addFeedForm.classList.add('hidden');
+             editingFeedId.value = ''; // Clear editing state
+        }
+        
+        function handleSaveFeed() {
+            const id = editingFeedId.value ? parseInt(editingFeedId.value) : null;
+            const name = newFeedName.value.trim();
+            const url = newFeedUrl.value.trim();
+            const category = newFeedCategory.value;
+
+            if (!name || !url || !category) {
+                showToast("Preencha todos os campos do feed.", "error");
+                return;
+            }
+            
+            // Basic URL validation
+            try {
+                 new URL(url);
+            } catch (_) {
+                 showToast("URL do feed inválida.", "error");
+                return;
+            }
+
+            if (id) {
+                // Update existing feed
+                const index = rssFeeds.findIndex(f => f.id === id);
+                if (index > -1) {
+                    rssFeeds[index] = { ...rssFeeds[index], name, url, category };
+                     showToast('Feed atualizado com sucesso!', 'success');
+                }
+            } else {
+                // Add new feed
+                const newId = rssFeeds.length > 0 ? Math.max(...rssFeeds.map(f => f.id)) + 1 : 1;
+                rssFeeds.push({ id: newId, name, url, category, active: true });
+                 showToast('Feed adicionado com sucesso!', 'success');
+            }
+            
+            saveRssFeeds();
+            loadRssFeedsList(); // Refresh the list
+            hideAddFeedForm();
+             // TODO: Trigger a refresh of the news list if desired after adding/updating feeds
+             // loadNews(); // Potentially call this, maybe with a loading indicator
+        }
+        
+        function editFeed(id) {
+             const feed = rssFeeds.find(f => f.id === id);
+             if (feed) {
+                 showAddFeedForm(feed);
+                 // Scroll to the form if needed
+                 addFeedForm.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
+        
+        function toggleFeed(id) {
+            const index = rssFeeds.findIndex(f => f.id === id);
+            if (index > -1) {
+                rssFeeds[index].active = !rssFeeds[index].active;
+                saveRssFeeds();
+                loadRssFeedsList(); // Refresh list to show toggle state
+                 showToast(`Feed ${rssFeeds[index].active ? 'ativado' : 'desativado'}.`, 'success');
+                 // TODO: Trigger news refresh if needed
+                 // loadNews();
+            }
+        }
+
+        function deleteFeed(id) {
+            const feed = rssFeeds.find(f => f.id === id);
+            if (feed && confirm(`Tem certeza que deseja excluir o feed "${feed.name}"?`)) {
+                rssFeeds = rssFeeds.filter(f => f.id !== id);
+                saveRssFeeds();
+                loadRssFeedsList(); // Refresh the list
+                 showToast('Feed excluído com sucesso!', 'success');
+                 // TODO: Trigger news refresh if needed
+                 // loadNews();
+            }
+        }
+
+        // --- Text-to-Speech & Share ---
+        function speakText(text) {
+             if (!text) return;
+            if (speechSynthesis.speaking) {
+                speechSynthesis.cancel(); // Stop previous speech
+                 speakBtn.innerHTML = '<i class="fas fa-volume-up mr-1"></i> Ouvir'; // Reset button text
+                return;
+            }
+            if (speechSynthesis.paused) {
+                speechSynthesis.resume();
+                speakBtn.innerHTML = '<i class="fas fa-pause mr-1"></i> Pausar';
+                return;
+            }
+
+            utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = 'pt-BR';
+             // Change button text during speech
+            utterance.onstart = () => {
+                 speakBtn.innerHTML = '<i class="fas fa-pause mr-1"></i> Pausar';
+             };
+            utterance.onpause = () => {
+                 speakBtn.innerHTML = '<i class="fas fa-play mr-1"></i> Retomar';
+            };
+             utterance.onresume = () => {
+                 speakBtn.innerHTML = '<i class="fas fa-pause mr-1"></i> Pausar';
+             };
+            utterance.onend = () => {
+                 speakBtn.innerHTML = '<i class="fas fa-volume-up mr-1"></i> Ouvir';
+                 utterance = null; // Clear utterance when finished
+            };
+            utterance.onerror = (event) => {
+                console.error('SpeechSynthesisUtterance.onerror', event);
+                 showToast('Erro ao tentar reproduzir áudio.', 'error');
+                 speakBtn.innerHTML = '<i class="fas fa-volume-up mr-1"></i> Ouvir';
+                 utterance = null;
+             }
+            
+            speechSynthesis.speak(utterance);
+        }
+
+        async function shareNews(title, url) {
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: title,
+                        text: `Confira esta notícia: ${title}`,
+                        url: url,
+                    });
+                    console.log('Notícia compartilhada com sucesso!');
+                } catch (err) {
+                    console.error('Erro ao compartilhar:', err);
+                     // Don't show error toast if user cancelled share
+                     if (err.name !== 'AbortError') {
+                        showToast('Erro ao compartilhar notícia.', 'error');
+                    }
+                }
+            } else {
+                // Fallback for browsers that don't support Web Share API
+                 try {
+                    await navigator.clipboard.writeText(url);
+                    showToast('Link da notícia copiado para a área de transferência!', 'success');
+                } catch (err) {
+                    console.error('Erro ao copiar link:', err);
+                    showToast('Não foi possível copiar o link.', 'error');
+                }
+            }
+        }
+
+        // --- Event Listeners Setup ---
+        function setupEventListeners() {
+            themeToggle.addEventListener('click', () => {
+                const currentTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+                 const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                 applyTheme(newTheme);
+                 localStorage.setItem('theme', newTheme); // Save explicit preference
+                 // Update app setting only if default is not 'system'
+                 if (appSettings.defaultTheme !== 'system') {
+                     appSettings.defaultTheme = newTheme;
+                     saveAppSettingsToStorage();
+                     defaultThemeSelect.value = newTheme; // Update dropdown in settings
+                 }
+            });
+            
+            refreshBtn.addEventListener('click', () => {
+                 showToast('Atualizando notícias...', 'info');
+                 loadNews(); // Reload news
+             });
+
+            settingsBtn.addEventListener('click', openSettingsPanel);
+            closeSettingsBtn.addEventListener('click', closeSettingsPanel);
+            
+            filterBtn.addEventListener('click', openFilterDropdown);
+            closeFilterBtn.addEventListener('click', closeFilterDropdown);
+            applyFilterBtn.addEventListener('click', applyMobileFilters);
+
+            searchInput.addEventListener('input', (e) => {
+                currentSearch = e.target.value.toLowerCase().trim();
+                filterNews();
+            });
+
+            categoryBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    currentCategory = btn.dataset.category;
+                    categoryBtns.forEach(b => b.classList.remove('bg-primary-100', 'dark:bg-primary-900', 'text-primary-700', 'dark:text-primary-300'));
+                    categoryBtns.forEach(b => b.classList.add('bg-gray-100', 'dark:bg-gray-700'));
+                    btn.classList.add('bg-primary-100', 'dark:bg-primary-900', 'text-primary-700', 'dark:text-primary-300');
+                    btn.classList.remove('bg-gray-100', 'dark:bg-gray-700');
+                    filterNews();
+                });
+            });
+
+            loadMoreBtn.addEventListener('click', () => {
+                displayedCount += itemsPerLoad;
+                renderNews();
+            });
+
+            closeModalBtn.addEventListener('click', closeNewsModal);
+            // Close modal on overlay click
+             newsModal.addEventListener('click', (e) => {
+                if (e.target === newsModal || e.target.classList.contains('modal-overlay')) {
+                    closeNewsModal();
+                }
+            });
+            
+            // Interstitial Ad close buttons
+            closeAdBtn.addEventListener('click', () => closeInterstitialAd(true)); // Close and open news
+             forceCloseAdBtn.addEventListener('click', () => closeInterstitialAd(true)); // Also close and open news
+
+            // Modal action buttons
+            speakBtn.addEventListener('click', () => speakText(speakBtn.dataset.text));
+            shareBtn.addEventListener('click', () => shareNews(shareBtn.dataset.title, shareBtn.dataset.url));
+
+            // Admin listeners
+            loginBtn.addEventListener('click', adminLogin);
+            logoutBtn.addEventListener('click', adminLogout);
+            addFeedBtn.addEventListener('click', () => showAddFeedForm());
+            saveFeedBtn.addEventListener('click', handleSaveFeed);
+            cancelFeedBtn.addEventListener('click', hideAddFeedForm);
+            
+            // Settings Save Buttons
+            saveAppSettings.addEventListener('click', handleSaveAppSettings);
+            saveAdmobSettings.addEventListener('click', handleSaveAdmobSettings);
+            saveGlobalFallback.addEventListener('click', handleSaveGlobalFallback);
+            saveCategoryFallbacks.addEventListener('click', handleSaveCategoryFallbacks);
+
+            // Close settings/filter panels on Escape key
+            document.addEventListener('keydown', (e) => {
+                 if (e.key === 'Escape') {
+                     if (!settingsPanel.classList.contains('hidden')) closeSettingsPanel();
+                     if (!filterDropdown.classList.contains('hidden')) closeFilterDropdown();
+                     if (!newsModal.classList.contains('hidden')) closeNewsModal();
+                     if (!interstitialAd.classList.contains('hidden')) closeInterstitialAd(false); // Close ad, don't open news
+                }
+            });
+            
+             // Watch for system theme changes if 'system' is selected
+             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+                if (localStorage.getItem('theme') === 'system' || !localStorage.getItem('theme')) {
+                    applyTheme('system');
+                 }
+            });
+        }
+
+        // --- Start the App ---
+        document.addEventListener('DOMContentLoaded', init);
+
+    </script>
+</body>
+</html>
