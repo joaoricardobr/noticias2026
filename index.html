@@ -14,335 +14,103 @@
     .news-card-hover { border: 2px solid transparent; transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease; }
     .news-card-hover:hover {}
     .news-count-badge { min-width: 2rem; }
+     /* Garante que a imagem dentro do 'prose' no modal não seja exibida */
+    .modal-content-prose img {
+        display: none !important;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col font-sans">
   <div id="root"></div>
 
   <script type="text/babel">
-    // --- Configuração dos Feeds RSS (mantido) ---
-    const rssFeeds = { /* ...objeto rssFeeds mantido... */
-        "Todas": "https://g1.globo.com/dynamo/rss2.xml",
-        "Brasil": "https://g1.globo.com/dynamo/brasil/rss2.xml",
-        "Carros": "https://g1.globo.com/dynamo/carros/rss2.xml",
-        "Ciência e Saúde": "https://g1.globo.com/dynamo/ciencia-e-saude/rss2.xml",
-        "Concursos": "https://g1.globo.com/dynamo/concursos-e-emprego/rss2.xml",
-        "Economia": "https://g1.globo.com/dynamo/economia/rss2.xml",
-        "Mundo": "https://g1.globo.com/dynamo/mundo/rss2.xml",
-        "Música": "https://g1.globo.com/dynamo/musica/rss2.xml",
-        "Natureza": "https://g1.globo.com/dynamo/natureza/rss2.xml",
-        "Planeta Bizarro": "https://g1.globo.com/dynamo/planeta-bizarro/rss2.xml",
-        "Política": "https://g1.globo.com/dynamo/politica/mensalao/rss2.xml", // Manter ou achar feed geral?
-        "Pop & Arte": "https://g1.globo.com/dynamo/pop-arte/rss2.xml",
-        "Tecnologia": "https://g1.globo.com/dynamo/tecnologia/rss2.xml",
-        "Turismo": "https://g1.globo.com/dynamo/turismo-e-viagem/rss2.xml",
-    };
-
-    // --- NOVO Proxy CORS ---
-    // Tentativa com corsproxy.io. REMOVA ou SUBSTITUA em produção!
+    // --- Configurações, Proxy, Placeholders, Utilitários, SpeechManager (mantidos como na versão anterior) ---
+    const rssFeeds = { /* ... */
+        "Todas": "https://g1.globo.com/dynamo/rss2.xml", "Brasil": "https://g1.globo.com/dynamo/brasil/rss2.xml", "Carros": "https://g1.globo.com/dynamo/carros/rss2.xml", "Ciência e Saúde": "https://g1.globo.com/dynamo/ciencia-e-saude/rss2.xml", "Concursos": "https://g1.globo.com/dynamo/concursos-e-emprego/rss2.xml", "Economia": "https://g1.globo.com/dynamo/economia/rss2.xml", "Mundo": "https://g1.globo.com/dynamo/mundo/rss2.xml", "Música": "https://g1.globo.com/dynamo/musica/rss2.xml", "Natureza": "https://g1.globo.com/dynamo/natureza/rss2.xml", "Planeta Bizarro": "https://g1.globo.com/dynamo/planeta-bizarro/rss2.xml", "Política": "https://g1.globo.com/dynamo/politica/mensalao/rss2.xml", "Pop & Arte": "https://g1.globo.com/dynamo/pop-arte/rss2.xml", "Tecnologia": "https://g1.globo.com/dynamo/tecnologia/rss2.xml", "Turismo": "https://g1.globo.com/dynamo/turismo-e-viagem/rss2.xml",
+     };
     const CORS_PROXY = "https://corsproxy.io/?";
-    // const CORS_PROXY = "https://api.allorigins.win/raw?url="; // Outra alternativa comum
-
-    // Imagem Placeholder (mantido)
+    // const CORS_PROXY = "https://api.allorigins.win/raw?url=";
     const PLACEHOLDER_IMAGE = "https://via.placeholder.com/600x400/cccccc/969696.png?text=Imagem+Indisponível";
-
-    // --- Utilitários (stripHtml, formatDate - mantidos) ---
-    const stripHtml = (html) => { /* ...código mantido... */
-         if (!html) return ""; const tmp = document.createElement("DIV"); tmp.innerHTML = html; return tmp.textContent || tmp.innerText || "";
-     }
-    const formatDate = (dateString) => { /* ...código mantido... */
-        try { const date = new Date(dateString); return date.toLocaleDateString("pt-BR", { day: '2-digit', month: 'short', year: 'numeric', }); } catch (e) { console.warn("Error formatting date:", dateString, e); return "Data inválida"; }
-     };
-
-    // --- Gerenciamento de Speech Synthesis (speechManager - mantido) ---
+    const stripHtml = (html) => { if (!html) return ""; const tmp = document.createElement("DIV"); tmp.innerHTML = html; return tmp.textContent || tmp.innerText || ""; }
+    const formatDate = (dateString) => { try { const date = new Date(dateString); return date.toLocaleDateString("pt-BR", { day: '2-digit', month: 'short', year: 'numeric', }); } catch (e) { return "Data inválida"; } };
     const speechManager = { /* ...código mantido... */
-         utterance: null, isSpeaking: false, speakingItemId: null,
-        speak: function(text, itemId, onEndCallback) { if (!('speechSynthesis' in window)) { alert("Seu navegador não suporta leitura por voz."); return; } if (this.isSpeaking && this.speakingItemId === itemId) { window.speechSynthesis.cancel(); return; } if(window.speechSynthesis.speaking) { window.speechSynthesis.cancel(); } const cleanText = stripHtml(text); if (!cleanText) return; this.utterance = new SpeechSynthesisUtterance(cleanText); this.utterance.lang = 'pt-BR'; const voices = window.speechSynthesis.getVoices(); const portugueseVoice = voices.find(voice => voice.lang === 'pt-BR'); if (portugueseVoice) this.utterance.voice = portugueseVoice; this.utterance.onstart = () => { this.isSpeaking = true; this.speakingItemId = itemId; }; this.utterance.onend = () => { if (this.speakingItemId === itemId) { this.isSpeaking = false; this.speakingItemId = null; this.utterance = null; onEndCallback(); } }; this.utterance.onerror = (event) => { console.error("SpeechSynthesis Error:", event); if (this.speakingItemId === itemId) { this.isSpeaking = false; this.speakingItemId = null; this.utterance = null; onEndCallback(); alert(`Erro na leitura: ${event.error}`); } }; window.speechSynthesis.speak(this.utterance); },
-        cancel: function(onEndCallback) { if (window.speechSynthesis.speaking || this.utterance) { window.speechSynthesis.cancel(); this.isSpeaking = false; this.speakingItemId = null; this.utterance = null; if (onEndCallback) onEndCallback(); } },
-        loadVoices: function() { if ('speechSynthesis' in window && window.speechSynthesis.onvoiceschanged !== undefined) { window.speechSynthesis.onvoiceschanged = () => { console.log("Voices loaded:", window.speechSynthesis.getVoices().length); }; window.speechSynthesis.getVoices(); } }
+         utterance: null, isSpeaking: false, speakingItemId: null, speak: function(text, itemId, onEndCallback) { if (!('speechSynthesis' in window)) return alert("Navegador não suporta voz."); if (this.isSpeaking && this.speakingItemId === itemId) return window.speechSynthesis.cancel(); if(window.speechSynthesis.speaking) window.speechSynthesis.cancel(); const cleanText = stripHtml(text); if (!cleanText) return; this.utterance = new SpeechSynthesisUtterance(cleanText); this.utterance.lang = 'pt-BR'; const voices = window.speechSynthesis.getVoices(); const portugueseVoice = voices.find(voice => voice.lang === 'pt-BR'); if (portugueseVoice) this.utterance.voice = portugueseVoice; this.utterance.onstart = () => { this.isSpeaking = true; this.speakingItemId = itemId; }; this.utterance.onend = () => { if (this.speakingItemId === itemId) { this.isSpeaking = false; this.speakingItemId = null; this.utterance = null; onEndCallback(); } }; this.utterance.onerror = (event) => { console.error("Speech Error:", event); if (this.speakingItemId === itemId) { this.isSpeaking = false; this.speakingItemId = null; this.utterance = null; onEndCallback(); alert(`Erro leitura: ${event.error}`); } }; window.speechSynthesis.speak(this.utterance); }, cancel: function(onEndCallback) { if (window.speechSynthesis.speaking || this.utterance) { window.speechSynthesis.cancel(); this.isSpeaking = false; this.speakingItemId = null; this.utterance = null; if (onEndCallback) onEndCallback(); } }, loadVoices: function() { if ('speechSynthesis' in window && window.speechSynthesis.onvoiceschanged !== undefined) { window.speechSynthesis.onvoiceschanged = () => {}; window.speechSynthesis.getVoices(); } }
     };
 
-    // --- Dados Estáticos (Exemplo para Top 10 no Modal) ---
-    // Mantido apenas para o modal, não para a lista principal
-    const topTenNews = [
-        { id: 101, title: "Avanço na cura do câncer é anunciado", source: "BBC", category: "Saúde", image: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?q=80&w=100&auto=format&fit=crop" },
-        { id: 102, title: "Novo recorde nas Olimpíadas", source: "ESPN", category: "Esportes", image: "https://images.unsplash.com/photo-1552673597-e3e352297b5c?q=80&w=100&auto=format&fit=crop" },
-        { id: 103, title: "Acordo global reduz emissões", source: "Reuters", category: "Mundo", image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=100&auto=format&fit=crop" },
-        { id: 104, title: "IA generativa transforma educação", source: "TechCrunch", category: "Tecnologia", image: "https://images.unsplash.com/photo-1516321310764-959200eb3b04?q=80&w=100&auto=format&fit=crop" },
-        { id: 105, title: "Filme brasileiro ganha prêmio", source: "Variety", category: "Entretenimento", image: "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=100&auto=format&fit=crop" },
-        { id: 106, title: "PIB global cresce", source: "Financial Times", category: "Economia", image: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236aa?q=80&w=100&auto=format&fit=crop" },
-        { id: 107, title: "Nova espécie marinha descoberta", source: "NatGeo", category: "Ciência", image: "https://images.unsplash.com/photo-1564769609132-0b8c2d11b254?q=80&w=100&auto=format&fit=crop" },
-        { id: 108, title: "Reforma política aprovada", source: "Estadão", category: "Política", image: "https://images.unsplash.com/photo-1560167084-5a8e9d1149eb?q=80&w=100&auto=format&fit=crop" },
-        { id: 109, title: "Vacina universal contra gripe avança", source: "The Guardian", category: "Saúde", image: "https://images.unsplash.com/photo-1607619056574-7b8d3b81886e?q=80&w=100&auto=format&fit=crop" },
-        { id: 110, title: "Satélite brasileiro lançado", source: "Globo", category: "Tecnologia", image: "https://images.unsplash.com/photo-1636819488524-1f022c4ebed8?q=80&w=100&auto=format&fit=crop" }
-    ];
-
-
-    // --- Componentes React ---
-
-    // AdBanner, AdCard, PremiumAdModal (mantidos)
-    const AdBanner = ({ position, isDarkMode }) => { /* ...código mantido... */
-         return ( <div className={`py-4 px-6 rounded-lg shadow-md text-center ${isDarkMode ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-800"}`}> <p className="text-base font-semibold"> {position === "top" ? "Anúncio Simulado - Topo" : position === "modal" ? "Anúncio Simulado - Modal" : position === "premium-modal" ? "Anúncio Simulado - Premium" : "Anúncio Simulado - Rodapé"} </p> <p className="text-sm mt-2"> {position === "top" ? "Descubra as melhores ofertas!" : position === "modal" ? "Confira nossas novidades!" : position === "premium-modal" ? "Aproveite sem interrupções!" : "Explore mais conteúdos!"} </p> <a href="#" className={`inline-block mt-3 px-5 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${isDarkMode ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-blue-500 text-white hover:bg-blue-600"}`} onClick={(e) => e.preventDefault()} > Saiba mais </a> </div> );
-     };
-    const AdCard = ({ isDarkMode }) => { /* ...código mantido... */
-         return ( <div className={`rounded-lg overflow-hidden shadow-lg flex flex-col h-full p-5 text-center news-card-hover ${isDarkMode ? "bg-gray-800 text-gray-200 hover:border-gray-600" : "bg-white text-gray-800 hover:border-gray-300"}`}> <div className="flex-grow flex flex-col items-center justify-center"> <p className="text-lg font-bold mb-2">Espaço Publicitário</p> <p className={`text-sm mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}> Anuncie aqui! </p> <a href="#" className={`inline-block px-5 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${ isDarkMode ? "bg-green-600 text-white hover:bg-green-700" : "bg-green-500 text-white hover:bg-green-600" }`} onClick={(e) => e.preventDefault()} > Anuncie Conosco </a> </div> </div> );
-     };
-     const PremiumAdModal = ({ onClose, isDarkMode }) => { /* ...código mantido... */
-         const handleBuyPremium = () => { alert("Compra Premium..."); onClose(); }; const handleWatchAds = () => { alert("Assistir Ads..."); onClose(); }; return ( <div className={`fixed inset-0 flex items-center justify-center z-50 ${isDarkMode ? "bg-gray-900 bg-opacity-75" : "bg-gray-100 bg-opacity-75"}`}> <div className={`rounded-lg shadow-xl p-6 max-w-md w-full ${isDarkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}> <div className="flex justify-between items-center mb-4"> <h2 className="text-xl font-bold">NewsFlow Premium!</h2> <button onClick={onClose} className={`p-1 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-400 hover:text-white hover:bg-gray-700" : "text-gray-600 hover:text-gray-800 hover:bg-gray-200"}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /> </svg> </button> </div> <p className={`text-sm mb-4 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}> Experiência sem anúncios. Escolha uma opção: </p> <div className="mb-6"> <AdBanner position="premium-modal" isDarkMode={isDarkMode} /> </div> <div className="flex flex-col space-y-4"> <button onClick={handleBuyPremium} className={`w-full px-5 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${ isDarkMode ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-blue-500 text-white hover:bg-blue-600" }`} > Comprar (R$ 4,90) </button> <button onClick={handleWatchAds} className={`w-full px-5 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${ isDarkMode ? "bg-gray-600 text-white hover:bg-gray-700" : "bg-gray-300 text-gray-800 hover:bg-gray-400" }`} > Ver 4 anúncios (Grátis 24h) </button> </div> </div> </div> );
-     };
+    // --- Componentes (AdBanner, AdCard, PremiumAdModal - mantidos) ---
+     const AdBanner = ({ position, isDarkMode }) => { /* ... */
+         return ( <div className={`py-4 px-6 rounded-lg shadow-md text-center ${isDarkMode ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-800"}`}> <p className="text-base font-semibold"> {position === "top" ? "Anúncio - Topo" : position === "modal" ? "Anúncio - Modal" : position === "premium-modal" ? "Anúncio - Premium" : "Anúncio - Rodapé"} </p> <p className="text-sm mt-2"> {position === "top" ? "Ofertas!" : position === "modal" ? "Novidades!" : position === "premium-modal" ? "Sem interrupções!" : "Mais conteúdos!"} </p> <a href="#" className={`inline-block mt-3 px-5 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${isDarkMode ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-blue-500 text-white hover:bg-blue-600"}`} onClick={(e) => e.preventDefault()} > Saiba mais </a> </div> );
+      };
+     const AdCard = ({ isDarkMode }) => { /* ... */
+          return ( <div className={`rounded-lg overflow-hidden shadow-lg flex flex-col h-full p-5 text-center news-card-hover ${isDarkMode ? "bg-gray-800 text-gray-200 hover:border-gray-600" : "bg-white text-gray-800 hover:border-gray-300"}`}> <div className="flex-grow flex flex-col items-center justify-center"> <p className="text-lg font-bold mb-2">Publicidade</p> <p className={`text-sm mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}> Anuncie aqui! </p> <a href="#" className={`inline-block px-5 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${ isDarkMode ? "bg-green-600 text-white hover:bg-green-700" : "bg-green-500 text-white hover:bg-green-600" }`} onClick={(e) => e.preventDefault()} > Anuncie Conosco </a> </div> </div> );
+      };
+     const PremiumAdModal = ({ onClose, isDarkMode }) => { /* ... */
+         const handleBuyPremium = () => { alert("Compra Premium..."); onClose(); }; const handleWatchAds = () => { alert("Assistir Ads..."); onClose(); }; return ( <div className={`fixed inset-0 flex items-center justify-center z-50 ${isDarkMode ? "bg-gray-900 bg-opacity-75" : "bg-gray-100 bg-opacity-75"}`}> <div className={`rounded-lg shadow-xl p-6 max-w-md w-full ${isDarkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}> <div className="flex justify-between items-center mb-4"> <h2 className="text-xl font-bold">NewsFlow Premium!</h2> <button onClick={onClose} className={`p-1 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-400 hover:text-white hover:bg-gray-700" : "text-gray-600 hover:text-gray-800 hover:bg-gray-200"}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /> </svg> </button> </div> <p className={`text-sm mb-4 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}> Sem anúncios. Escolha: </p> <div className="mb-6"> <AdBanner position="premium-modal" isDarkMode={isDarkMode} /> </div> <div className="flex flex-col space-y-4"> <button onClick={handleBuyPremium} className={`w-full px-5 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${ isDarkMode ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-blue-500 text-white hover:bg-blue-600" }`} > Comprar (R$ 4,90) </button> <button onClick={handleWatchAds} className={`w-full px-5 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${ isDarkMode ? "bg-gray-600 text-white hover:bg-gray-700" : "bg-gray-300 text-gray-800 hover:bg-gray-400" }`} > Ver 4 Ads (Grátis 24h) </button> </div> </div> </div> );
+      };
 
     // Navigation (mantido)
-    const Navigation = ({ onCategoryChange, activeCategory, isDarkMode }) => { /* ...código mantido com ícones válidos... */
-        const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-        const navItems = [ { label: "Todas", icon: "M3 12h18M3 6h18M3 18h18" }, { label: "Brasil", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }, { label: "Carros", icon: "M19 7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7z" }, { label: "Ciência e Saúde", icon: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" }, { label: "Concursos", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" }, { label: "Economia", icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }, { label: "Mundo", icon: "M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }, { label: "Música", icon: "M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" }, { label: "Natureza", icon: "M17.657 18.657l-4.243-4.243M6.343 5.343l4.243 4.243M17.657 5.343l-4.243 4.243M6.343 18.657l4.243-4.243M12 16a4 4 0 110-8 4 4 0 010 8z" }, { label: "Planeta Bizarro", icon: "M12 14l9-5-9-5-9 5 9 5zm0 7l9-5-9-5-9 5 9 5z" }, { label: "Política", icon: "M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" }, { label: "Pop & Arte", icon: "M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" }, { label: "Tecnologia", icon: "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" }, { label: "Turismo", icon: "M17.657 4.343a8 8 0 11-11.314 11.314L12 21.213l5.657-5.556a8 8 0 010-11.314zM12 12a3 3 0 100-6 3 3 0 000 6z" }, { label: "Favoritos", icon: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z", iconClass: isDarkMode ? "text-red-500" : "text-red-600" } ];
-        return ( <nav className={`p-4 rounded-lg shadow-lg ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}> <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"> <div className="flex justify-between items-center sm:hidden"> <span className={`font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Categorias</span> <button onClick={() => setIsMenuOpen(!isMenuOpen)} className={`p-2 rounded-lg ${isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-700 hover:bg-gray-300"}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={isMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} /> </svg> </button> </div> {isMenuOpen && ( <div className="sm:hidden mt-2 space-y-1"> {navItems.map((item, index) => ( <button key={index} onClick={() => { onCategoryChange(item.label); setIsMenuOpen(false); }} className={`flex items-center w-full p-3 rounded-lg transition-all duration-200 text-left ${ activeCategory === item.label ? (isDarkMode ? "bg-blue-600 text-white" : "bg-blue-500 text-white") : (isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-700 hover:bg-gray-300") }`} > <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 flex-shrink-0 ${item.iconClass || ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} /> </svg> <span className="ml-3 text-sm font-medium">{item.label}</span> </button> ))} </div> )} <div className="hidden sm:flex flex-wrap justify-center gap-2"> {navItems.map((item, index) => ( <button key={index} onClick={() => onCategoryChange(item.label)} title={item.label} className={`flex items-center p-2 rounded-lg transition-all duration-300 group relative ${ activeCategory === item.label ? (isDarkMode ? "bg-blue-600 text-white shadow-md" : "bg-blue-500 text-white shadow-md") : (isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-blue-400" : "text-gray-700 hover:bg-gray-300 hover:text-blue-600") }`} > <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 flex-shrink-0 ${item.iconClass || ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} /> </svg> <span className="ml-2 text-sm font-medium hidden md:inline">{item.label}</span> </button> ))} </div> </div> </nav> );
+    const Navigation = ({ onCategoryChange, activeCategory, isDarkMode }) => { /* ... */
+         const [isMenuOpen, setIsMenuOpen] = React.useState(false); const navItems = [ { label: "Todas", icon: "M3 12h18M3 6h18M3 18h18" }, { label: "Brasil", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }, { label: "Carros", icon: "M19 7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7z" }, { label: "Ciência e Saúde", icon: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" }, { label: "Concursos", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" }, { label: "Economia", icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }, { label: "Mundo", icon: "M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }, { label: "Música", icon: "M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" }, { label: "Natureza", icon: "M17.657 18.657l-4.243-4.243M6.343 5.343l4.243 4.243M17.657 5.343l-4.243 4.243M6.343 18.657l4.243-4.243M12 16a4 4 0 110-8 4 4 0 010 8z" }, { label: "Planeta Bizarro", icon: "M12 14l9-5-9-5-9 5 9 5zm0 7l9-5-9-5-9 5 9 5z" }, { label: "Política", icon: "M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" }, { label: "Pop & Arte", icon: "M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" }, { label: "Tecnologia", icon: "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" }, { label: "Turismo", icon: "M17.657 4.343a8 8 0 11-11.314 11.314L12 21.213l5.657-5.556a8 8 0 010-11.314zM12 12a3 3 0 100-6 3 3 0 000 6z" }, { label: "Favoritos", icon: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z", iconClass: isDarkMode ? "text-red-500" : "text-red-600" } ]; return ( <nav className={`p-4 rounded-lg shadow-lg ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}> <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"> <div className="flex justify-between items-center sm:hidden"> <span className={`font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Categorias</span> <button onClick={() => setIsMenuOpen(!isMenuOpen)} className={`p-2 rounded-lg ${isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-700 hover:bg-gray-300"}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={isMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} /> </svg> </button> </div> {isMenuOpen && ( <div className="sm:hidden mt-2 space-y-1"> {navItems.map((item, index) => ( <button key={index} onClick={() => { onCategoryChange(item.label); setIsMenuOpen(false); }} className={`flex items-center w-full p-3 rounded-lg transition-all duration-200 text-left ${ activeCategory === item.label ? (isDarkMode ? "bg-blue-600 text-white" : "bg-blue-500 text-white") : (isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-700 hover:bg-gray-300") }`} > <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 flex-shrink-0 ${item.iconClass || ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} /> </svg> <span className="ml-3 text-sm font-medium">{item.label}</span> </button> ))} </div> )} <div className="hidden sm:flex flex-wrap justify-center gap-2"> {navItems.map((item, index) => ( <button key={index} onClick={() => onCategoryChange(item.label)} title={item.label} className={`flex items-center p-2 rounded-lg transition-all duration-300 group relative ${ activeCategory === item.label ? (isDarkMode ? "bg-blue-600 text-white shadow-md" : "bg-blue-500 text-white shadow-md") : (isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-blue-400" : "text-gray-700 hover:bg-gray-300 hover:text-blue-600") }`} > <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 flex-shrink-0 ${item.iconClass || ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} /> </svg> <span className="ml-2 text-sm font-medium hidden md:inline">{item.label}</span> </button> ))} </div> </div> </nav> );
+     };
+
+    // SearchAndFilters - Atualizado para responsividade mobile
+    const SearchAndFilters = ({ searchQuery, setSearchQuery, sortBy, setSortBy, handleRefresh, isDarkMode, isLoading }) => {
+        return (
+        <div className={`p-4 rounded-lg shadow-md ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}>
+            {/* Container principal agora ajusta flex-direction baseado em 'sm' */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            {/* Campo de Busca */}
+            <div className="flex-grow relative">
+                <input
+                type="text"
+                placeholder="Buscar notícias..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className={`w-full h-10 p-3 pl-10 rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${
+                    isDarkMode
+                    ? "bg-gray-700 text-white placeholder-gray-400 focus:ring-blue-500"
+                    : "bg-gray-300 text-gray-800 placeholder-gray-600 focus:ring-blue-400"
+                }`}
+                />
+                <svg /* ícone lupa */ xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /> </svg>
+            </div>
+
+            {/* Grupo de Filtros e Botão - AGORA SEMPRE flex-row */}
+            <div className="flex flex-row gap-3 items-center flex-shrink-0 w-full sm:w-auto"> {/* w-full no mobile */}
+                <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className={`h-10 p-2 rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 flex-grow sm:flex-grow-0 ${ /* flex-grow no mobile */
+                    isDarkMode
+                    ? "bg-gray-700 text-white focus:ring-blue-500"
+                    : "bg-gray-300 text-gray-800 focus:ring-blue-400"
+                }`}
+                >
+                <option value="newest">Recentes</option>
+                <option value="oldest">Antigos</option>
+                <option value="title-asc">Título A-Z</option>
+                <option value="title-desc">Título Z-A</option>
+                </select>
+                <button
+                onClick={handleRefresh}
+                disabled={isLoading}
+                className={`h-10 flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex-shrink-0 ${
+                    isDarkMode
+                    ? "bg-blue-500 text-white hover:bg-blue-600 disabled:bg-blue-700 disabled:opacity-70"
+                    : "bg-blue-400 text-white hover:bg-blue-500 disabled:bg-blue-300 disabled:opacity-70"
+                }`}
+                >
+                    {/* Ícone de loading ou refresh */}
+                    {isLoading ? ( <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"> <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle> <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path> </svg> ) : ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /> </svg> )}
+                    <span className="hidden sm:inline ml-2">{isLoading ? 'Atualizando...' : 'Atualizar'}</span> {/* Texto some no mobile */}
+                </button>
+            </div>
+            </div>
+        </div>
+        );
     };
 
-    // SearchAndFilters (mantido)
-    const SearchAndFilters = ({ searchQuery, setSearchQuery, sortBy, setSortBy, handleRefresh, isDarkMode, isLoading }) => { /* ...código mantido... */
-        return ( <div className={`p-4 rounded-lg shadow-md ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}> <div className="flex flex-col sm:flex-row sm:items-center gap-4"> <div className="flex-grow relative"> <input type="text" placeholder="Buscar notícias..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full h-10 p-3 pl-10 rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${ isDarkMode ? "bg-gray-700 text-white placeholder-gray-400 focus:ring-blue-500" : "bg-gray-300 text-gray-800 placeholder-gray-600 focus:ring-blue-400" }`} /> <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /> </svg> </div> <div className="flex flex-col sm:flex-row gap-3 items-center flex-shrink-0"> <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={`h-10 p-2 rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${ isDarkMode ? "bg-gray-700 text-white focus:ring-blue-500" : "bg-gray-300 text-gray-800 focus:ring-blue-400" }`} > <option value="newest">Recentes</option> <option value="oldest">Antigos</option> <option value="title-asc">Título A-Z</option> <option value="title-desc">Título Z-A</option> </select> <button onClick={handleRefresh} disabled={isLoading} className={`h-10 flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${ isDarkMode ? "bg-blue-500 text-white hover:bg-blue-600 disabled:bg-blue-700 disabled:opacity-70" : "bg-blue-400 text-white hover:bg-blue-500 disabled:bg-blue-300 disabled:opacity-70" }`} > {isLoading ? ( <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"> <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle> <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path> </svg> ) : ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /> </svg> )} {isLoading ? 'Atualizando...' : 'Atualizar'} </button> </div> </div> </div> );
-    };
 
     // NewsCard (mantido)
-    const NewsCard = ({ news, onOpenModal, isDarkMode, toggleFavorite, isFavorited, currentlySpeakingId, setCurrentlySpeakingId }) => { /* ...código mantido... */
-        const isCurrentlySpeaking = news.id === currentlySpeakingId; const handleSpeakClick = (event) => { event.stopPropagation(); if (!news.title) return; speechManager.speak(news.title, news.id, () => { setCurrentlySpeakingId(null); }); setCurrentlySpeakingId(speechManager.isSpeaking ? news.id : null); }; const hoverBorderColorClass = isDarkMode ? 'hover:border-blue-400' : 'hover:border-blue-500'; return ( <div className={`news-card-hover ${hoverBorderColorClass} rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transform hover:-translate-y-1 flex flex-col h-full cursor-pointer ${isDarkMode ? "bg-gray-800" : "bg-white"}`} onClick={() => onOpenModal(news)} role="article" aria-labelledby={`news-title-${news.id}`} > <div className="relative"> <img src={news.image || PLACEHOLDER_IMAGE} alt={`Imagem para: ${news.title}`} className="w-full h-48 object-cover sm:h-56 md:h-64" loading="lazy" onError={(e) => e.target.src = PLACEHOLDER_IMAGE} /> {news.category && ( <span className={`absolute top-2 left-2 text-white text-xs font-medium px-2 py-1 rounded-lg shadow ${isDarkMode ? "bg-blue-600" : "bg-blue-500"}`}> {news.category} </span> )} </div> <div className="p-5 flex flex-col flex-grow"> <div className="flex justify-between items-center mb-2 text-xs"> <p className={`font-medium ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>{news.source || "Fonte Desconhecida"}</p> {news.date && <p className={`${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{news.date}</p>} </div> <h3 id={`news-title-${news.id}`} className={`text-lg font-semibold line-clamp-3 mb-2 flex-grow ${isDarkMode ? "text-white" : "text-gray-900"}`}>{news.title || "Título Indisponível"}</h3> {news.summary && <p className={`text-sm line-clamp-2 mt-1 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>{news.summary}</p>} <div className={`flex justify-between items-center mt-4 pt-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}> <button onClick={(e) => { e.stopPropagation(); toggleFavorite(news.id); }} title={isFavorited ? "Remover dos Favoritos" : "Adicionar aos Favoritos"} className={`flex items-center p-2 rounded-full transition-colors duration-200 ${ isFavorited ? (isDarkMode ? "text-red-500 hover:bg-red-900 hover:bg-opacity-20" : "text-red-600 hover:bg-red-100") : (isDarkMode ? "text-gray-400 hover:text-red-400 hover:bg-gray-700" : "text-gray-600 hover:text-red-600 hover:bg-gray-200") }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={isFavorited ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={isFavorited ? 1 : 2}> <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /> </svg> </button> <button onClick={handleSpeakClick} title={isCurrentlySpeaking ? "Parar Leitura" : "Ouvir Título"} className={`flex items-center p-2 rounded-full transition-colors duration-200 ${ isCurrentlySpeaking ? (isDarkMode ? "text-yellow-400 bg-yellow-900 bg-opacity-30" : "text-yellow-600 bg-yellow-100") : (isDarkMode ? "text-gray-400 hover:text-blue-400 hover:bg-gray-700" : "text-gray-600 hover:text-blue-600 hover:bg-gray-200") }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"> {isCurrentlySpeaking ? ( <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /> ) : ( <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15z" /> )} </svg> </button> </div> </div> </div> );
-    };
-
-    // NewsModal (mantido)
-    const NewsModal = ({ news, onClose, isDarkMode, toggleFavorite, isFavorited, onOpenModal, currentlySpeakingId, setCurrentlySpeakingId }) => { /* ...código mantido... */
-         const isCurrentlySpeaking = news?.id === currentlySpeakingId; React.useEffect(() => { return () => { if (isCurrentlySpeaking) { speechManager.cancel(() => setCurrentlySpeakingId(null)); } }; }, [isCurrentlySpeaking, setCurrentlySpeakingId]); const handleSpeakClick = () => { if (!news?.content) return; const textToSpeak = `${news.title}. ${stripHtml(news.content)}`; speechManager.speak(textToSpeak, news.id, () => { setCurrentlySpeakingId(null); }); setCurrentlySpeakingId(speechManager.isSpeaking ? news.id : null); }; const handleShare = async () => { if (navigator.share && news) { try { await navigator.share({ title: news.title, text: news.summary || stripHtml(news.content).substring(0, 150) + '...', url: news.sourceLink || window.location.href, }); } catch (err) { console.error('Erro share:', err); navigator.clipboard.writeText(news.sourceLink || window.location.href).then(() => alert('Link copiado!')).catch(copyErr => console.error('Erro copy:', copyErr)); } } else if (news) { navigator.clipboard.writeText(news.sourceLink || window.location.href).then(() => alert('Link copiado!')).catch(err => console.error('Erro copy:', err)); } }; const generateTopNewsDetails = (topNews) => { return { ...topNews, id: `top-${topNews.id}`, date: new Date().toLocaleDateString("pt-BR"), summary: `Resumo: ${topNews.title.toLowerCase()}.`, content: `<p><strong>"${topNews.title}"</strong> - ${topNews.source} (${topNews.category}).</p><br/><p><em>(Conteúdo simulado)</em></p>`, sourceLink: `https://${topNews.source.toLowerCase().replace(/ /g, "")}.com` }; }; if (!news) return null; return ( <div className={`fixed inset-0 flex flex-col z-40 ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}> <div className={`flex justify-between items-center p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-300 bg-gray-100"} sticky top-0 z-10`}> <h2 className={`text-lg sm:text-xl font-bold line-clamp-1 ${isDarkMode ? "text-white" : "text-gray-800"}`}>{news.title}</h2> <button onClick={onClose} title="Fechar" className={`p-1 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-400 hover:text-white hover:bg-gray-700" : "text-gray-600 hover:text-gray-800 hover:bg-gray-200"}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /> </svg> </button> </div> <div className="p-5 overflow-y-auto flex-grow"> <div className="max-w-3xl mx-auto px-0 sm:px-4 lg:px-8"> <div className="flex flex-wrap justify-between items-center mb-4 gap-2 text-xs"> <div className="flex items-center space-x-2"> {news.category && ( <span className={`text-white font-medium px-2 py-1 rounded-lg shadow ${isDarkMode ? "bg-blue-600" : "bg-blue-500"}`}> {news.category} </span> )} <p className={`font-medium ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>{news.source || "G1"}</p> </div> {news.date && <p className={`${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{news.date}</p>} </div> <img src={news.image || PLACEHOLDER_IMAGE} alt={`Imagem para: ${news.title}`} className="w-full h-auto max-h-80 object-contain rounded-lg mb-5 shadow-md bg-gray-500" loading="lazy" onError={(e) => e.target.src = PLACEHOLDER_IMAGE} /> <div className={`prose prose-sm sm:prose-base max-w-none ${isDarkMode ? "prose-invert text-gray-300" : "text-gray-800"} [&_a]:text-blue-500 [&_a:hover]:underline`} dangerouslySetInnerHTML={{ __html: news.content || "<p>Conteúdo não disponível.</p>" }} /> <div className={`flex flex-wrap justify-between items-center gap-3 mt-6 pt-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}> <button onClick={() => toggleFavorite(news.id)} title={isFavorited ? "Remover Favorito" : "Adicionar Favorito"} className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border ${ isFavorited ? (isDarkMode ? "text-red-500 border-red-500 hover:bg-red-900 hover:bg-opacity-20" : "text-red-600 border-red-600 hover:bg-red-100") : (isDarkMode ? "text-gray-400 border-gray-600 hover:text-red-400 hover:border-red-400" : "text-gray-600 border-gray-400 hover:text-red-600 hover:border-red-600") }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill={isFavorited ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={isFavorited ? 1 : 2}> <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /> </svg> Favorito </button> <button onClick={handleSpeakClick} title={isCurrentlySpeaking ? "Parar Leitura" : "Ouvir Notícia"} className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border ${ isCurrentlySpeaking ? (isDarkMode ? "text-yellow-400 border-yellow-400 hover:bg-yellow-900 hover:bg-opacity-30" : "text-yellow-600 border-yellow-600 hover:bg-yellow-100") : (isDarkMode ? "text-gray-400 border-gray-600 hover:text-blue-400 hover:border-blue-400" : "text-gray-600 border-gray-400 hover:text-blue-600 hover:border-blue-600") }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"> {isCurrentlySpeaking ? ( <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /> ) : ( <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15z" /> )} </svg> {isCurrentlySpeaking ? 'Parar' : 'Ouvir'} </button> <button onClick={handleShare} title="Compartilhar" className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border ${ isDarkMode ? "text-gray-400 border-gray-600 hover:text-blue-400 hover:border-blue-400" : "text-gray-600 border-gray-400 hover:text-blue-600 hover:border-blue-600" }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /> </svg> Compartilhar </button> <a href={news.sourceLink} target="_blank" rel="noopener noreferrer" className={`flex items-center justify-center text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${ isDarkMode ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600" }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /> </svg> Visitar fonte </a> </div> <div className={`mt-8 pt-6 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}> <div className="mb-6"> <AdBanner position="modal" isDarkMode={isDarkMode} /> </div> <div> <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? "text-white" : "text-gray-800"}`}>Destaques do Dia</h3> <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"> {topTenNews.map((topNews) => ( <div key={topNews.id} className={`flex items-center p-3 rounded-lg shadow-md transition-all duration-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer ${ isDarkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200" }`} onClick={() => onOpenModal(generateTopNewsDetails(topNews))} > <img src={topNews.image} alt={topNews.title} className="w-16 h-16 object-cover rounded-lg mr-3 flex-shrink-0" loading="lazy" onError={(e) => e.target.src = PLACEHOLDER_IMAGE} /> <div className="flex-grow min-w-0"> <p className={`text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"} line-clamp-2`}>{topNews.title}</p> <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{topNews.source} • {topNews.category}</p> </div> <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ml-2 flex-shrink-0 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /> </svg> </div> ))} </div> </div> </div> </div> </div> </div> );
-    };
-
-    // --- Componente Principal (App) ---
-    const App = () => {
-      const [selectedNews, setSelectedNews] = React.useState(null);
-      const [isDarkMode, setIsDarkMode] = React.useState(true);
-      const [activeCategory, setActiveCategory] = React.useState("Todas"); // Categoria inicial
-      const [searchQuery, setSearchQuery] = React.useState("");
-      const [sortBy, setSortBy] = React.useState("newest");
-      const [newsData, setNewsData] = React.useState([]); // Inicia vazio, preenchido pelo fetch
-      const [favoritedNews, setFavoritedNews] = React.useState(() => { /* ...código localStorage mantido... */
-         const saved = localStorage.getItem('favoritedNews'); return saved ? new Set(JSON.parse(saved)) : new Set();
-       });
-      const [allFetchedNews, setAllFetchedNews] = React.useState({}); // Cache
-      const [showFavoritesOnly, setShowFavoritesOnly] = React.useState(false);
-      const [displayedNewsCount, setDisplayedNewsCount] = React.useState(12);
-      const [isLoading, setIsLoading] = React.useState(true); // Começa true para fetch inicial
-      const [error, setError] = React.useState(null);
-      const [showScrollTop, setShowScrollTop] = React.useState(false);
-      const [showPremiumModal, setShowPremiumModal] = React.useState(false);
-      const [currentlySpeakingId, setCurrentlySpeakingId] = React.useState(null);
-      const observer = React.useRef();
-
-      // Efeito para tema e salvar favoritos (mantido)
-      React.useEffect(() => { /* ...código mantido... */
-        speechManager.loadVoices(); const bodyClassList = document.body.classList; if (isDarkMode) { bodyClassList.add("bg-gray-900", "text-white"); bodyClassList.remove("bg-gray-100", "text-gray-800"); } else { bodyClassList.add("bg-gray-100", "text-gray-800"); bodyClassList.remove("bg-gray-900", "text-white"); } localStorage.setItem('favoritedNews', JSON.stringify(Array.from(favoritedNews)));
-       }, [isDarkMode, favoritedNews]);
-
-      // Fetch e Parse RSS com NOVO Proxy
-      const fetchAndParseRss = async (category) => {
-        speechManager.cancel(() => setCurrentlySpeakingId(null));
-
-        if (category === "Favoritos") {
-          setActiveCategory("Favoritos");
-          setShowFavoritesOnly(true);
-          setIsLoading(false); // Favoritos são carregados do cache, não busca
-          setError(null);
-          const favoriteItems = Object.values(allFetchedNews).flat().filter(news => favoritedNews.has(news.id)).filter((news, index, self) => index === self.findIndex(n => n.id === news.id));
-          setNewsData(favoriteItems);
-          setDisplayedNewsCount(favoriteItems.length);
-          return;
-        }
-
-        setShowFavoritesOnly(false);
-        setActiveCategory(category);
-        setIsLoading(true);
-        setError(null);
-        setNewsData([]); // Limpa antes da nova busca
-        setDisplayedNewsCount(12);
-
-        const feedUrl = rssFeeds[category];
-        if (!feedUrl) {
-          setError(`Feed RSS para "${category}" não configurado.`);
-          setIsLoading(false);
-          return;
-        }
-
-        // --- USA O NOVO PROXY ---
-        const urlToFetch = CORS_PROXY + encodeURIComponent(feedUrl); // encodeURIComponent é importante para corsproxy.io
-        // const urlToFetch = CORS_PROXY + feedUrl; // Se usar allorigins
-        console.log(`Fetching RSS from: ${urlToFetch} for category: ${category}`);
-
-        try {
-          const response = await fetch(urlToFetch, {
-              // Adicionar cabeçalhos pode ajudar com alguns proxies, mas não é garantia
-              // headers: { 'X-Requested-With': 'XMLHttpRequest' }
-          });
-          if (!response.ok) {
-            // Tenta dar uma mensagem de erro mais útil
-             let errorDetail = `status: ${response.status}`;
-             try {
-                 const errorText = await response.text();
-                 // Verifica se a resposta do proxy indica erro específico
-                 if (errorText.includes("Missing required parameter")) errorDetail += " (URL alvo faltando no proxy?)"
-                 else if (errorText.includes("rate limited")) errorDetail += " (Proxy sobrecarregado, tente depois)"
-                 else errorDetail += ` - ${errorText.substring(0,100)}...` // Mostra início da resposta
-             } catch {}
-
-             throw new Error(`Erro HTTP! ${errorDetail}. O proxy CORS pode estar offline ou bloqueando a solicitação.`);
-          }
-          const xmlText = await response.text();
-          const parser = new DOMParser();
-          const xmlDoc = parser.parseFromString(xmlText, "application/xml"); // Usar application/xml pode ser mais robusto
-          const parserError = xmlDoc.querySelector("parsererror");
-          if (parserError) {
-             // Verifica se o erro é por causa de HTML (comum com allorigins)
-             if (xmlText.trim().startsWith('<') && !xmlText.trim().startsWith('<?xml')) {
-                console.warn("Parece ser HTML em vez de XML. Proxy pode ter retornado página de erro.");
-             }
-             throw new Error(`Erro ao analisar XML de ${category}: ${parserError.textContent}`);
-          }
-
-          const items = xmlDoc.querySelectorAll("item");
-          if (items.length === 0 && !xmlDoc.querySelector("channel")) { // Checa se realmente não tem itens e nem estrutura de feed
-             throw new Error(`Nenhum item encontrado no feed de ${category}. Resposta pode estar vazia ou mal formatada.`);
-          }
-
-          console.log(`Found ${items.length} items in feed for ${category}`);
-          const parsedNews = [];
-          items.forEach((item, index) => {
-            const title = item.querySelector("title")?.textContent || "";
-            const link = item.querySelector("link")?.textContent || "";
-            const guidElement = item.querySelector("guid");
-            const guid = guidElement?.textContent || link || `rss-${category}-${Date.now()}-${index}`;
-            const pubDate = item.querySelector("pubDate")?.textContent || ""; // Guardar raw para ordenação
-            const description = item.querySelector("description")?.textContent || "";
-            let image = null;
-            const mediaContent = item.querySelector("media\\:content, content");
-            if (mediaContent) image = mediaContent.getAttribute("url");
-            else { const imgMatch = description.match(/<img src="([^"]+)"/); if (imgMatch?.[1]) image = imgMatch[1]; }
-
-            parsedNews.push({
-              id: guid, source: "G1", title: title, image: image,
-              date: formatDate(pubDate), // Data formatada para exibição
-              pubDateRaw: pubDate, // Data original para ordenação
-              summary: stripHtml(description).substring(0, 150) + (stripHtml(description).length > 150 ? '...' : ''),
-              content: description, sourceLink: link, category: category,
-            });
-          });
-
-          setNewsData(parsedNews);
-          setAllFetchedNews(prevCache => ({ ...prevCache, [category]: parsedNews }));
-
-        } catch (err) {
-          console.error("Falha ao buscar ou analisar RSS:", err);
-          setError(`Falha ao carregar ${category}. ${err.message}`);
-          setNewsData([]); // Limpa dados em caso de erro
-        } finally {
-          setIsLoading(false);
-        }
-      };
-
-      // Efeito inicial (busca "Todas")
-      React.useEffect(() => {
-        fetchAndParseRss("Todas");
-      }, []); // Roda só na montagem inicial
-
-      // Funções toggle (mantidas)
-      const toggleDarkMode = () => setIsDarkMode(prev => !prev);
-      const toggleFavorite = (newsId) => { /* ...código mantido... */
-         setFavoritedNews(prev => { const newSet = new Set(prev); if (newSet.has(newsId)) newSet.delete(newsId); else newSet.add(newsId); return newSet; });
-      };
-
-      // Refresh (mantido)
-      const handleRefresh = () => { /* ...código mantido... */
-         console.log("Refreshing category:", activeCategory); setSearchQuery(""); setSortBy("newest"); fetchAndParseRss(activeCategory);
-      };
-
-      // Load More (mantido)
-       const loadMoreNews = () => { /* ...código mantido... */
-             if (showFavoritesOnly || displayedNewsCount >= filteredNews.length) return; setIsLoading(true); setTimeout(() => { const moreNewsToAdd = 12; setDisplayedNewsCount(prev => Math.min(prev + moreNewsToAdd, filteredNews.length)); setIsLoading(false); }, 300);
-        };
-
-      // Filtro e Ordenação (ajustado para usar pubDateRaw)
-       const filteredNews = React.useMemo(() => {
-           let dataToFilter = showFavoritesOnly
-               ? Object.values(allFetchedNews).flat().filter(news => favoritedNews.has(news.id)).filter((news, index, self) => index === self.findIndex(n => n.id === news.id))
-               : newsData;
-           const searchedData = dataToFilter.filter(news => !searchQuery || news.title.toLowerCase().includes(searchQuery.toLowerCase()) || (news.summary && news.summary.toLowerCase().includes(searchQuery.toLowerCase())) );
-           return [...searchedData].sort((a, b) => {
-               const parseDate = (dateStr) => { try { return new Date(dateStr || 0); } catch { return new Date(0); } };
-               // Prioriza pubDateRaw para ordenação por data
-               if (sortBy === "newest") return parseDate(b.pubDateRaw || b.date) - parseDate(a.pubDateRaw || a.date);
-               if (sortBy === "oldest") return parseDate(a.pubDateRaw || a.date) - parseDate(b.pubDateRaw || b.date);
-               if (sortBy === "title-asc") return a.title.localeCompare(b.title);
-               if (sortBy === "title-desc") return b.title.localeCompare(a.title);
-               return 0;
-           });
-       }, [showFavoritesOnly ? favoritedNews : newsData, allFetchedNews, searchQuery, sortBy]); // Dependências atualizadas
-
-      const newsToDisplay = filteredNews.slice(0, displayedNewsCount);
-
-      // Scroll e AdCard (mantidos)
-      const lastNewsElementRef = React.useCallback(node => { /* ...código mantido... */
-             if (isLoading || showFavoritesOnly) return; if (observer.current) observer.current.disconnect(); observer.current = new IntersectionObserver(entries => { if (entries[0].isIntersecting && displayedNewsCount < filteredNews.length) { loadMoreNews(); } }, { threshold: 0.5 }); if (node) observer.current.observe(node);
-        }, [isLoading, showFavoritesOnly, displayedNewsCount, filteredNews.length]);
-      const handleScroll = () => setShowScrollTop(window.scrollY > 300);
-      const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
-      React.useEffect(() => { window.addEventListener("scroll", handleScroll); return () => window.removeEventListener("scroll", handleScroll); }, []);
-      const itemsToRender = [];
-      const adInsertionIndex = 4;
-      newsToDisplay.forEach((news, index) => { /* ...código mantido... */
-           itemsToRender.push( <div key={news.id} ref={index === newsToDisplay.length - 1 ? lastNewsElementRef : null} > <NewsCard news={news} onOpenModal={setSelectedNews} isDarkMode={isDarkMode} toggleFavorite={toggleFavorite} isFavorited={favoritedNews.has(news.id)} currentlySpeakingId={currentlySpeakingId} setCurrentlySpeakingId={setCurrentlySpeakingId} /> </div> ); if (index === adInsertionIndex - 1 && newsToDisplay.length >= adInsertionIndex) { itemsToRender.push(<AdCard key="ad-card-middle" isDarkMode={isDarkMode} />); }
-      });
-
-      // --- Renderização do App ---
-      return (
-        <div className={`flex flex-col min-h-screen transition-colors duration-300 ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"}`}>
-           {/* Header */}
-           <header className={`p-4 sticky top-0 z-20 shadow-lg ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}>
-              {/* ...código do header mantido com ícone de config... */}
-                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"> <div className="flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4"> <div className="flex items-center flex-shrink-0"> <h1 className={`font-bold text-xl sm:text-2xl tracking-tight ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>NewsFlow</h1> </div> <div className="flex items-center space-x-2 sm:space-x-3"> <span title={`${newsToDisplay.length} notícias exibidas`} className={`news-count-badge flex items-center justify-center text-xs font-semibold px-2.5 py-1 rounded-full ${isDarkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-300 text-gray-700'}`}> {isLoading && !showFavoritesOnly ? ( <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> ) : ( newsToDisplay.length )} </span> <button onClick={toggleDarkMode} title={isDarkMode ? "Modo Claro" : "Modo Escuro"} className={`p-2 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-yellow-400" : "text-gray-700 hover:bg-gray-300 hover:text-blue-600"}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">{isDarkMode ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /> : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />}</svg> </button> <button onClick={() => setShowPremiumModal(true)} title="Opções Premium" className={`p-2 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-green-400" : "text-gray-700 hover:bg-gray-300 hover:text-green-600"}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18L12 6M12 18L9 15M12 18L15 15M12 6L9 9M12 6L15 9M5 21H19C20.1046 21 21 20.1046 21 19V5C21 3.89543 20.1046 3 19 3H5C3.89543 3 3 3.89543 3 5V19C3 20.1046 3.89543 21 5 21Z" /></svg> </button> <button onClick={() => fetchAndParseRss(activeCategory === "Favoritos" ? "Todas" : "Favoritos")} title={activeCategory === "Favoritos" ? "Mostrar Todas" : "Mostrar Favoritos"} className={`p-2 rounded-full transition-colors duration-200 ${activeCategory === "Favoritos" ? (isDarkMode ? "text-red-500 bg-red-900 bg-opacity-30" : "text-red-600 bg-red-100") : (isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-red-400" : "text-gray-700 hover:bg-gray-300 hover:text-red-600")}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={activeCategory === "Favoritos" ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={activeCategory === "Favoritos" ? 1 : 2}> <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /> </svg> </button> <button onClick={() => alert('Configurações...')} title="Configurações" className={`p-2 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-blue-400" : "text-gray-700 hover:bg-gray-300 hover:text-blue-600"}`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"> <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /> <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /> </svg> </button> </div> </div> </div>
-           </header>
-
-           {/* Navegação, Anúncio, Busca */}
-           <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-             <Navigation onCategoryChange={fetchAndParseRss} activeCategory={activeCategory} isDarkMode={isDarkMode} />
-             <AdBanner position="top" isDarkMode={isDarkMode} />
-             <SearchAndFilters searchQuery={searchQuery} setSearchQuery={setSearchQuery} sortBy={sortBy} setSortBy={setSortBy} handleRefresh={handleRefresh} isDarkMode={isDarkMode} isLoading={isLoading && !showFavoritesOnly} />
-           </div>
-
-           {/* Conteúdo Principal (Grid) */}
-           <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 flex-grow">
-            {/* Mensagem de Erro */}
-             {error && ( <div className={`p-4 mb-6 rounded-lg text-center ${isDarkMode ? 'bg-red-800 text-red-100' : 'bg-red-100 text-red-700'}`}> <p className="font-bold text-lg mb-2">Ops! Algo deu errado.</p> <p className="text-sm">{error}</p> <button onClick={handleRefresh} className={`mt-3 px-4 py-1.5 rounded text-sm font-medium ${isDarkMode ? 'bg-red-600 hover:bg-red-500' : 'bg-red-200 hover:bg-red-300'}`}>Tentar Novamente</button> </div> )}
-             {/* Grid ou Mensagens */}
-             {isLoading && itemsToRender.length === 0 && !showFavoritesOnly && !error ? ( <div className="text-center py-10"> <p className={`text-xl font-semibold mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Carregando {activeCategory}...</p> <svg className={`animate-spin mx-auto h-10 w-10 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"> <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle> <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path> </svg> </div> ) : itemsToRender.length > 0 ? ( <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"> {itemsToRender} </div> ) : !isLoading && !error ? ( <p className={`text-center py-10 text-lg ${isDarkMode ? "text-gray-500" : "text-gray-600"}`}> Nenhuma notícia encontrada para "{activeCategory}"{searchQuery ? ` com "${searchQuery}"` : ''}. </p> ) : null}
-             {/* Load More Indicator */}
-             {isLoading && itemsToRender.length > 0 && !showFavoritesOnly && ( <div className="text-center py-6 mt-6"> <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Carregando mais...</p> </div> )}
-             {/* Fim das Notícias */}
-             {!isLoading && displayedNewsCount >= filteredNews.length && filteredNews.length > 0 && !showFavoritesOnly && ( <div className="text-center py-10 mt-6"> <p className={`text-lg font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Fim das notícias.</p> </div> )}
-             {showFavoritesOnly && filteredNews.length > 0 && ( <div className="text-center py-10 mt-6"> <p className={`text-lg font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Exibindo {filteredNews.length} favorito(s).</p> </div> )}
-             {showFavoritesOnly && filteredNews.length === 0 && !isLoading && ( <div className="text-center py-10 mt-6"> <p className={`text-lg font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Você ainda não tem favoritos.</p><p className={`text-sm ${isDarkMode ? "text-gray-500" : "text-gray-600"}`}>Clique no ❤️ para adicionar.</p> </div> )}
-           </main>
-
-           {/* Anúncio Inferior e Footer (mantidos) */}
-           <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6"> <AdBanner position="footer" isDarkMode={isDarkMode} /> </div>
-           <footer className={`w-full py-6 mt-auto ${isDarkMode ? 'bg-gray-800' : 'bg-gray-200'}`}> <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center"> <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}> © {new Date().getFullYear()} Todos os direitos reservados.<br /> Desenvolvido por João Ricardo - Engenheiro da Computação{' '} <a href="https://www.instagram.com/joaoricardo.pe" target="_blank" rel="noopener noreferrer" className={`font-medium hover:underline ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}> @joaoricardo.pe </a> </p> </div> </footer>
-
-           {/* Botão Scroll-to-Top (mantido) */}
-           {showScrollTop && ( <button onClick={scrollToTop} title="Voltar ao topo" className={`fixed bottom-6 right-6 p-3 rounded-full shadow-lg transition-all duration-300 z-30 ${isDarkMode ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-blue-500 text-white hover:bg-blue-600"}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" /></svg> </button> )}
-
-           {/* Modais (mantidos) */}
-           <NewsModal news={selectedNews} onClose={() => { if (selectedNews && currentlySpeakingId === selectedNews.id) { speechManager.cancel(() => setCurrentlySpeakingId(null)); } setSelectedNews(null); }} isDarkMode={isDarkMode} toggleFavorite={toggleFavorite} isFavorited={selectedNews ? favoritedNews.has(selectedNews.id) : false} onOpenModal={setSelectedNews} currentlySpeakingId={currentlySpeakingId} setCurrentlySpeakingId={setCurrentlySpeakingId} />
-           {showPremiumModal && ( <PremiumAdModal onClose={() => setShowPremiumModal(false)} isDarkMode={isDarkMode} /> )}
-        </div>
-      );
-    };
-
-    // Renderiza a aplicação
-    const root = ReactDOM.createRoot(document.getElementById("root"));
-    root.render(<App />);
-  </script>
-</body>
-</html>
+    const NewsCard = ({ news, onOpenModal, isDarkMode, toggleFavorite, isFavorited, currentlySpeakingId, setCurrentlySpeakingId }) => { /* ... */
+         const isCurrentlySpeaking = news.id === currentlySpeakingId; const handleSpeakClick = (event) => { event.stopPropagation(); if (!news.title) return; speechManager.speak(news.title, news.id, () => { setCurrentlySpeakingId(null); }); setCurrentlySpeakingId(speechManager.isSpeaking ? news.id : null); }; const hoverBorderColorClass = isDarkMode ? 'hover:border-blue-400' : 'hover:border-blue-500'; return ( <div className={`news-card-hover ${hoverBorderColorClass} rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transform hover:-translate-y-1 flex flex-col h-full cursor-pointer ${isDarkMode ? "bg-gray-800" : "bg-white"}`} onClick={() => onOpenModal(news)} role="article" aria-labelledby={`news-title-${news.id}`} > <div className="relative"> <img src={news.image || PLACEHOLDER_IMAGE} alt={`Imagem para: ${news.title}`} className="w-full h-48 object-cover sm:h-56 md:h-64" loading="lazy" onError={(e) => e.target.src = PLACEHOLDER_IMAGE} /> {news.category && ( <span className={`absolute top-2 left-2 text-white text-xs font-medium px-2 py-1 rounded-lg shadow ${isDarkMode ? "bg-blue-600" : "bg-blue-500"}`}> {news.category} </span> )} </div> <div className="p-5 flex flex-col flex-grow"> <div className="flex justify-between items-center mb-2 text-xs"> <p className={`font-medium ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>{news.source || "G1"}</p> {news.date && <p className={`${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{news.date}</p>} </div> <h3 id={`news-title-${news.id}`} className={`text-lg font-semibold line-clamp-3 mb-2 flex-grow ${isDarkMode ? "text-white" : "text-gray-900"}`}>{news.title || "Título"}</h3> {news.summary && <p className={`text-sm line-clamp-2 mt-1 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>{news.summary}</p>} <div className={`flex justify-between items-center mt-4 pt-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}> <button onClick={(e) => { e.stopPropagation(); toggleFavorite(news.id); }} title={isFavorited ? "Remover Favorito" : "Adicionar Favorito"} className={`flex items-center p-2 rounded-full transition-colors duration-200 ${ isFavorited ? (isDarkMode ? "text-red-500 hover:bg-red-900 hover:bg-opacity-20" : "text-red-600 hover:bg-red-100") : (isDarkMode ? "text-gray-400 hover:text-red-400 hover:bg-gray-700" : "text-gray-600 hover:text-red-600 hover:bg-gray-200") }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={isFavorited ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={isFavorited ? 1 : 2}> <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4
