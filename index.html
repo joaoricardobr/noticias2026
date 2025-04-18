@@ -3,402 +3,1600 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NewsFlow - G1 Feeds</title>
+  <title>NewsFlow - G1 Feeds (AdMob Ready)</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
   <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.22.5/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.0/papaparse.min.js"></script> 
   <style>
     body { transition: background-color 0.3s ease, color 0.3s ease; }
     .news-card-hover { border: 2px solid transparent; transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease; }
-    .news-card-hover:hover {}
+    /* Removed empty hover rule */
     .news-count-badge { min-width: 2rem; }
-     /* Garante que a imagem dentro do 'prose' no modal não seja exibida */
-    .modal-content-prose img {
-        display: none !important;
-    }
+    .modal-content-prose img { display: none !important; } /* Keep images out of modal content */
+    /* Styles for active/inactive tabs (used in SettingsModal) */
+    .tab-button-active { border-bottom-width: 2px; }
+    .tab-button-inactive { border-bottom-width: 0px; }
   </style>
 </head>
 <body class="min-h-screen flex flex-col font-sans">
+
   <div id="root"></div>
 
   <script type="text/babel">
-    // --- Configurações, Proxy, Placeholders, Utilitários, SpeechManager (mantidos como na versão anterior) ---
-    const rssFeeds = { /* ... */
-        "Todas": "https://g1.globo.com/dynamo/rss2.xml", "Brasil": "https://g1.globo.com/dynamo/brasil/rss2.xml", "Carros": "https://g1.globo.com/dynamo/carros/rss2.xml", "Ciência e Saúde": "https://g1.globo.com/dynamo/ciencia-e-saude/rss2.xml", "Concursos": "https://g1.globo.com/dynamo/concursos-e-emprego/rss2.xml", "Economia": "https://g1.globo.com/dynamo/economia/rss2.xml", "Mundo": "https://g1.globo.com/dynamo/mundo/rss2.xml", "Música": "https://g1.globo.com/dynamo/musica/rss2.xml", "Natureza": "https://g1.globo.com/dynamo/natureza/rss2.xml", "Planeta Bizarro": "https://g1.globo.com/dynamo/planeta-bizarro/rss2.xml", "Política": "https://g1.globo.com/dynamo/politica/mensalao/rss2.xml", "Pop & Arte": "https://g1.globo.com/dynamo/pop-arte/rss2.xml", "Tecnologia": "https://g1.globo.com/dynamo/tecnologia/rss2.xml", "Turismo": "https://g1.globo.com/dynamo/turismo-e-viagem/rss2.xml",
+    // --- Initial Configurations ---
+    // Default RSS Feeds if none are found in localStorage settings
+    const initialRssFeeds = {
+        "Todas": "https://g1.globo.com/dynamo/rss2.xml", "Brasil": "https://g1.globo.com/dynamo/brasil/rss2.xml", "Carros": "https://g1.globo.com/dynamo/carros/rss2.xml", "Ciência e Saúde": "https://g1.globo.com/dynamo/ciencia-e-saude/rss2.xml", "Concursos": "https://g1.globo.com/dynamo/concursos-e-emprego/rss2.xml", "Economia": "https://g1.globo.com/dynamo/economia/rss2.xml", "Mundo": "https://g1.globo.com/dynamo/mundo/rss2.xml", "Música": "https://g1.globo.com/dynamo/musica/rss2.xml", "Natureza": "https://g1.globo.com/dynamo/natureza/rss2.xml", "Planeta Bizarro": "https://g1.globo.com/dynamo/planeta-bizarro/rss2.xml", "Política": "https://g1.globo.com/dynamo/politica/mensalao/rss2.xml", // Note: Mensalao might be outdated
+        "Pop & Arte": "https://g1.globo.com/dynamo/pop-arte/rss2.xml", "Tecnologia": "https://g1.globo.com/dynamo/tecnologia/rss2.xml", "Turismo": "https://g1.globo.com/dynamo/turismo-e-viagem/rss2.xml",
      };
-    const CORS_PROXY = "https://corsproxy.io/?";
-    // const CORS_PROXY = "https://api.allorigins.win/raw?url=";
+    const CORS_PROXY = "https://corsproxy.io/?"; // Using corsproxy.io
     const PLACEHOLDER_IMAGE = "https://via.placeholder.com/600x400/cccccc/969696.png?text=Imagem+Indisponível";
+
+    // --- AdMob Test Ad Unit IDs ---
+    const ADMOB_TEST_IDS = {
+      BANNER: 'ca-app-pub-3940256099942544/6300978111',
+      NATIVE_ADVANCED: 'ca-app-pub-3940256099942544/2247696110',
+      REWARDED: 'ca-app-pub-3940256099942544/5224354917',
+      // Add others if needed (INTERSTITIAL, APP_OPEN, etc.)
+      // INTERSTITIAL: 'ca-app-pub-3940256099942544/1033173712',
+      // APP_OPEN: 'ca-app-pub-3940256099942544/9257395921',
+    };
+
+    // --- Utility Functions ---
     const stripHtml = (html) => { if (!html) return ""; const tmp = document.createElement("DIV"); tmp.innerHTML = html; return tmp.textContent || tmp.innerText || ""; }
-    const formatDate = (dateString) => { try { const date = new Date(dateString); return date.toLocaleDateString("pt-BR", { day: '2-digit', month: 'short', year: 'numeric', }); } catch (e) { return "Data inválida"; } };
-    const speechManager = { /* ...código mantido... */
-         utterance: null, isSpeaking: false, speakingItemId: null, speak: function(text, itemId, onEndCallback) { if (!('speechSynthesis' in window)) return alert("Navegador não suporta voz."); if (this.isSpeaking && this.speakingItemId === itemId) return window.speechSynthesis.cancel(); if(window.speechSynthesis.speaking) window.speechSynthesis.cancel(); const cleanText = stripHtml(text); if (!cleanText) return; this.utterance = new SpeechSynthesisUtterance(cleanText); this.utterance.lang = 'pt-BR'; const voices = window.speechSynthesis.getVoices(); const portugueseVoice = voices.find(voice => voice.lang === 'pt-BR'); if (portugueseVoice) this.utterance.voice = portugueseVoice; this.utterance.onstart = () => { this.isSpeaking = true; this.speakingItemId = itemId; }; this.utterance.onend = () => { if (this.speakingItemId === itemId) { this.isSpeaking = false; this.speakingItemId = null; this.utterance = null; onEndCallback(); } }; this.utterance.onerror = (event) => { console.error("Speech Error:", event); if (this.speakingItemId === itemId) { this.isSpeaking = false; this.speakingItemId = null; this.utterance = null; onEndCallback(); alert(`Erro leitura: ${event.error}`); } }; window.speechSynthesis.speak(this.utterance); }, cancel: function(onEndCallback) { if (window.speechSynthesis.speaking || this.utterance) { window.speechSynthesis.cancel(); this.isSpeaking = false; this.speakingItemId = null; this.utterance = null; if (onEndCallback) onEndCallback(); } }, loadVoices: function() { if ('speechSynthesis' in window && window.speechSynthesis.onvoiceschanged !== undefined) { window.speechSynthesis.onvoiceschanged = () => {}; window.speechSynthesis.getVoices(); } }
+    const formatDate = (dateString) => { try { const date = new Date(dateString); if (isNaN(date)) return "Data Inválida"; return date.toLocaleDateString("pt-BR", { day: '2-digit', month: 'short', year: 'numeric', /* Optional: hour: '2-digit', minute: '2-digit' */ }); } catch (e) { console.error("FormatDate Error:", e); return "Data inválida"; } };
+    const speechManager = {
+         utterance: null, isSpeaking: false, speakingItemId: null,
+         speak: function(text, itemId, onEndCallback) {
+             if (!('speechSynthesis' in window)) { console.warn("Speech Synthesis not supported"); return alert("Seu navegador não suporta a funcionalidade de voz."); }
+             if (this.isSpeaking && this.speakingItemId === itemId) { window.speechSynthesis.cancel(); /* Will trigger onend */ return; }
+             if(window.speechSynthesis.speaking) window.speechSynthesis.cancel(); // Stop any previous utterance
+             const cleanText = stripHtml(text); if (!cleanText) { console.warn("No text to speak for item:", itemId); return; }
+             this.utterance = new SpeechSynthesisUtterance(cleanText);
+             this.utterance.lang = 'pt-BR';
+             // Attempt to find a specific Portuguese voice (optional)
+             const voices = window.speechSynthesis.getVoices();
+             const portugueseVoice = voices.find(voice => voice.lang === 'pt-BR' && voice.localService); // Prefer local voices
+             if (portugueseVoice) { this.utterance.voice = portugueseVoice; }
+             else { const fallbackVoice = voices.find(voice => voice.lang === 'pt-BR'); if (fallbackVoice) this.utterance.voice = fallbackVoice; }
+
+             this.utterance.onstart = () => { console.log("Speech started for:", itemId); this.isSpeaking = true; this.speakingItemId = itemId; /* Might need state update here if passed as prop */ };
+             this.utterance.onend = () => { console.log("Speech ended for:", itemId); if (this.speakingItemId === itemId) { this.isSpeaking = false; this.speakingItemId = null; this.utterance = null; if (onEndCallback) onEndCallback(); } };
+             this.utterance.onerror = (event) => { console.error("Speech Synthesis Error:", event); if (this.speakingItemId === itemId) { this.isSpeaking = false; this.speakingItemId = null; this.utterance = null; if (onEndCallback) onEndCallback(); alert(`Erro na leitura: ${event.error}`); } };
+             window.speechSynthesis.speak(this.utterance);
+         },
+         cancel: function(onEndCallback) {
+             if (window.speechSynthesis.speaking || this.utterance) {
+                 console.log("Cancelling speech");
+                 window.speechSynthesis.cancel(); // This should trigger the 'onend' event of the current utterance
+                 // Reset state immediately in case onend doesn't fire reliably
+                 this.isSpeaking = false;
+                 this.speakingItemId = null;
+                 this.utterance = null;
+                 if (onEndCallback) onEndCallback();
+             }
+         },
+         // Ensure voices are loaded (especially needed on some browsers)
+         loadVoices: function() { if ('speechSynthesis' in window && window.speechSynthesis.onvoiceschanged !== undefined) { window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); }; } window.speechSynthesis.getVoices(); }
     };
 
-    // --- Componentes (AdBanner, AdCard, PremiumAdModal - mantidos) ---
-     const AdBanner = ({ position, isDarkMode }) => { /* ... */
-         return ( <div className={`py-4 px-6 rounded-lg shadow-md text-center ${isDarkMode ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-800"}`}> <p className="text-base font-semibold"> {position === "top" ? "Anúncio - Topo" : position === "modal" ? "Anúncio - Modal" : position === "premium-modal" ? "Anúncio - Premium" : "Anúncio - Rodapé"} </p> <p className="text-sm mt-2"> {position === "top" ? "Ofertas!" : position === "modal" ? "Novidades!" : position === "premium-modal" ? "Sem interrupções!" : "Mais conteúdos!"} </p> <a href="#" className={`inline-block mt-3 px-5 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${isDarkMode ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-blue-500 text-white hover:bg-blue-600"}`} onClick={(e) => e.preventDefault()} > Saiba mais </a> </div> );
-      };
-     const AdCard = ({ isDarkMode }) => { /* ... */
-          return ( <div className={`rounded-lg overflow-hidden shadow-lg flex flex-col h-full p-5 text-center news-card-hover ${isDarkMode ? "bg-gray-800 text-gray-200 hover:border-gray-600" : "bg-white text-gray-800 hover:border-gray-300"}`}> <div className="flex-grow flex flex-col items-center justify-center"> <p className="text-lg font-bold mb-2">Publicidade</p> <p className={`text-sm mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}> Anuncie aqui! </p> <a href="#" className={`inline-block px-5 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${ isDarkMode ? "bg-green-600 text-white hover:bg-green-700" : "bg-green-500 text-white hover:bg-green-600" }`} onClick={(e) => e.preventDefault()} > Anuncie Conosco </a> </div> </div> );
-      };
-     const PremiumAdModal = ({ onClose, isDarkMode }) => { /* ... */
-         const handleBuyPremium = () => { alert("Compra Premium..."); onClose(); }; const handleWatchAds = () => { alert("Assistir Ads..."); onClose(); }; return ( <div className={`fixed inset-0 flex items-center justify-center z-50 ${isDarkMode ? "bg-gray-900 bg-opacity-75" : "bg-gray-100 bg-opacity-75"}`}> <div className={`rounded-lg shadow-xl p-6 max-w-md w-full ${isDarkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}> <div className="flex justify-between items-center mb-4"> <h2 className="text-xl font-bold">NewsFlow Premium!</h2> <button onClick={onClose} className={`p-1 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-400 hover:text-white hover:bg-gray-700" : "text-gray-600 hover:text-gray-800 hover:bg-gray-200"}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /> </svg> </button> </div> <p className={`text-sm mb-4 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}> Sem anúncios. Escolha: </p> <div className="mb-6"> <AdBanner position="premium-modal" isDarkMode={isDarkMode} /> </div> <div className="flex flex-col space-y-4"> <button onClick={handleBuyPremium} className={`w-full px-5 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${ isDarkMode ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-blue-500 text-white hover:bg-blue-600" }`} > Comprar (R$ 4,90) </button> <button onClick={handleWatchAds} className={`w-full px-5 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${ isDarkMode ? "bg-gray-600 text-white hover:bg-gray-700" : "bg-gray-300 text-gray-800 hover:bg-gray-400" }`} > Ver 4 Ads (Grátis 24h) </button> </div> </div> </div> );
-      };
+    // --- AdMob Placeholder Components ---
 
-    // Navigation (mantido)
-    const Navigation = ({ onCategoryChange, activeCategory, isDarkMode }) => { /* ... */
-         const [isMenuOpen, setIsMenuOpen] = React.useState(false); const navItems = [ { label: "Todas", icon: "M3 12h18M3 6h18M3 18h18" }, { label: "Brasil", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }, { label: "Carros", icon: "M19 7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7z" }, { label: "Ciência e Saúde", icon: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" }, { label: "Concursos", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" }, { label: "Economia", icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }, { label: "Mundo", icon: "M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }, { label: "Música", icon: "M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" }, { label: "Natureza", icon: "M17.657 18.657l-4.243-4.243M6.343 5.343l4.243 4.243M17.657 5.343l-4.243 4.243M6.343 18.657l4.243-4.243M12 16a4 4 0 110-8 4 4 0 010 8z" }, { label: "Planeta Bizarro", icon: "M12 14l9-5-9-5-9 5 9 5zm0 7l9-5-9-5-9 5 9 5z" }, { label: "Política", icon: "M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" }, { label: "Pop & Arte", icon: "M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" }, { label: "Tecnologia", icon: "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" }, { label: "Turismo", icon: "M17.657 4.343a8 8 0 11-11.314 11.314L12 21.213l5.657-5.556a8 8 0 010-11.314zM12 12a3 3 0 100-6 3 3 0 000 6z" }, { label: "Favoritos", icon: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z", iconClass: isDarkMode ? "text-red-500" : "text-red-600" } ]; return ( <nav className={`p-4 rounded-lg shadow-lg ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}> <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"> <div className="flex justify-between items-center sm:hidden"> <span className={`font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Categorias</span> <button onClick={() => setIsMenuOpen(!isMenuOpen)} className={`p-2 rounded-lg ${isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-700 hover:bg-gray-300"}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={isMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} /> </svg> </button> </div> {isMenuOpen && ( <div className="sm:hidden mt-2 space-y-1"> {navItems.map((item, index) => ( <button key={index} onClick={() => { onCategoryChange(item.label); setIsMenuOpen(false); }} className={`flex items-center w-full p-3 rounded-lg transition-all duration-200 text-left ${ activeCategory === item.label ? (isDarkMode ? "bg-blue-600 text-white" : "bg-blue-500 text-white") : (isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-700 hover:bg-gray-300") }`} > <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 flex-shrink-0 ${item.iconClass || ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} /> </svg> <span className="ml-3 text-sm font-medium">{item.label}</span> </button> ))} </div> )} <div className="hidden sm:flex flex-wrap justify-center gap-2"> {navItems.map((item, index) => ( <button key={index} onClick={() => onCategoryChange(item.label)} title={item.label} className={`flex items-center p-2 rounded-lg transition-all duration-300 group relative ${ activeCategory === item.label ? (isDarkMode ? "bg-blue-600 text-white shadow-md" : "bg-blue-500 text-white shadow-md") : (isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-blue-400" : "text-gray-700 hover:bg-gray-300 hover:text-blue-600") }`} > <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 flex-shrink-0 ${item.iconClass || ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} /> </svg> <span className="ml-2 text-sm font-medium hidden md:inline">{item.label}</span> </button> ))} </div> </div> </nav> );
-     };
-
-    // SearchAndFilters - Atualizado para responsividade mobile
-    const SearchAndFilters = ({ searchQuery, setSearchQuery, sortBy, setSortBy, handleRefresh, isDarkMode, isLoading }) => {
-        return (
-        <div className={`p-4 rounded-lg shadow-md ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}>
-            {/* Container principal agora ajusta flex-direction baseado em 'sm' */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-            {/* Campo de Busca */}
-            <div className="flex-grow relative">
-                <input
-                type="text"
-                placeholder="Buscar notícias..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className={`w-full h-10 p-3 pl-10 rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${
-                    isDarkMode
-                    ? "bg-gray-700 text-white placeholder-gray-400 focus:ring-blue-500"
-                    : "bg-gray-300 text-gray-800 placeholder-gray-600 focus:ring-blue-400"
-                }`}
-                />
-                <svg /* ícone lupa */ xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /> </svg>
-            </div>
-
-            {/* Grupo de Filtros e Botão - AGORA SEMPRE flex-row */}
-            <div className="flex flex-row gap-3 items-center flex-shrink-0 w-full sm:w-auto"> {/* w-full no mobile */}
-                <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className={`h-10 p-2 rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 flex-grow sm:flex-grow-0 ${ /* flex-grow no mobile */
-                    isDarkMode
-                    ? "bg-gray-700 text-white focus:ring-blue-500"
-                    : "bg-gray-300 text-gray-800 focus:ring-blue-400"
-                }`}
-                >
-                <option value="newest">Recentes</option>
-                <option value="oldest">Antigos</option>
-                <option value="title-asc">Título A-Z</option>
-                <option value="title-desc">Título Z-A</option>
-                </select>
-                <button
-                onClick={handleRefresh}
-                disabled={isLoading}
-                className={`h-10 flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex-shrink-0 ${
-                    isDarkMode
-                    ? "bg-blue-500 text-white hover:bg-blue-600 disabled:bg-blue-700 disabled:opacity-70"
-                    : "bg-blue-400 text-white hover:bg-blue-500 disabled:bg-blue-300 disabled:opacity-70"
-                }`}
-                >
-                    {/* Ícone de loading ou refresh */}
-                    {isLoading ? ( <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"> <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle> <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path> </svg> ) : ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /> </svg> )}
-                    <span className="hidden sm:inline ml-2">{isLoading ? 'Atualizando...' : 'Atualizar'}</span> {/* Texto some no mobile */}
-                </button>
-            </div>
-            </div>
-        </div>
-        );
-    };
-
-
-    // NewsCard (mantido)
-    const NewsCard = ({ news, onOpenModal, isDarkMode, toggleFavorite, isFavorited, currentlySpeakingId, setCurrentlySpeakingId }) => { /* ... */
-         const isCurrentlySpeaking = news.id === currentlySpeakingId; const handleSpeakClick = (event) => { event.stopPropagation(); if (!news.title) return; speechManager.speak(news.title, news.id, () => { setCurrentlySpeakingId(null); }); setCurrentlySpeakingId(speechManager.isSpeaking ? news.id : null); }; const hoverBorderColorClass = isDarkMode ? 'hover:border-blue-400' : 'hover:border-blue-500'; return ( <div className={`news-card-hover ${hoverBorderColorClass} rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transform hover:-translate-y-1 flex flex-col h-full cursor-pointer ${isDarkMode ? "bg-gray-800" : "bg-white"}`} onClick={() => onOpenModal(news)} role="article" aria-labelledby={`news-title-${news.id}`} > <div className="relative"> <img src={news.image || PLACEHOLDER_IMAGE} alt={`Imagem para: ${news.title}`} className="w-full h-48 object-cover sm:h-56 md:h-64" loading="lazy" onError={(e) => e.target.src = PLACEHOLDER_IMAGE} /> {news.category && ( <span className={`absolute top-2 left-2 text-white text-xs font-medium px-2 py-1 rounded-lg shadow ${isDarkMode ? "bg-blue-600" : "bg-blue-500"}`}> {news.category} </span> )} </div> <div className="p-5 flex flex-col flex-grow"> <div className="flex justify-between items-center mb-2 text-xs"> <p className={`font-medium ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>{news.source || "G1"}</p> {news.date && <p className={`${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{news.date}</p>} </div> <h3 id={`news-title-${news.id}`} className={`text-lg font-semibold line-clamp-3 mb-2 flex-grow ${isDarkMode ? "text-white" : "text-gray-900"}`}>{news.title || "Título"}</h3> {news.summary && <p className={`text-sm line-clamp-2 mt-1 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>{news.summary}</p>} <div className={`flex justify-between items-center mt-4 pt-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}> <button onClick={(e) => { e.stopPropagation(); toggleFavorite(news.id); }} title={isFavorited ? "Remover Favorito" : "Adicionar Favorito"} className={`flex items-center p-2 rounded-full transition-colors duration-200 ${ isFavorited ? (isDarkMode ? "text-red-500 hover:bg-red-900 hover:bg-opacity-20" : "text-red-600 hover:bg-red-100") : (isDarkMode ? "text-gray-400 hover:text-red-400 hover:bg-gray-700" : "text-gray-600 hover:text-red-600 hover:bg-gray-200") }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={isFavorited ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={isFavorited ? 1 : 2}> <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /> </svg> </button> <button onClick={handleSpeakClick} title={isCurrentlySpeaking ? "Parar" : "Ouvir Título"} className={`flex items-center p-2 rounded-full transition-colors duration-200 ${ isCurrentlySpeaking ? (isDarkMode ? "text-yellow-400 bg-yellow-900 bg-opacity-30" : "text-yellow-600 bg-yellow-100") : (isDarkMode ? "text-gray-400 hover:text-blue-400 hover:bg-gray-700" : "text-gray-600 hover:text-blue-600 hover:bg-gray-200") }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"> {isCurrentlySpeaking ? ( <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /> ) : ( <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15z" /> )} </svg> </button> </div> </div> </div> );
-      };
-
-    // NewsModal - Atualizado para destaques reais e correção de imagem
-    const NewsModal = ({ news, allNewsData, onClose, isDarkMode, toggleFavorite, isFavorited, onOpenModal, currentlySpeakingId, setCurrentlySpeakingId }) => {
-        const isCurrentlySpeaking = news?.id === currentlySpeakingId;
-
-        React.useEffect(() => {
-            return () => { if (isCurrentlySpeaking) { speechManager.cancel(() => setCurrentlySpeakingId(null)); } };
-        }, [isCurrentlySpeaking, setCurrentlySpeakingId]);
-
-        const handleSpeakClick = () => {
-            if (!news?.content) return;
-            const textToSpeak = `${news.title}. ${stripHtml(news.content)}`;
-            speechManager.speak(textToSpeak, news.id, () => { setCurrentlySpeakingId(null); });
-            setCurrentlySpeakingId(speechManager.isSpeaking ? news.id : null);
-        };
-
-        const handleShare = async () => { /* ...código de share mantido... */
-             if (navigator.share && news) { try { await navigator.share({ title: news.title, text: news.summary || stripHtml(news.content).substring(0, 150) + '...', url: news.sourceLink || window.location.href, }); } catch (err) { console.error('Erro share:', err); navigator.clipboard.writeText(news.sourceLink || window.location.href).then(() => alert('Link copiado!')).catch(copyErr => console.error('Erro copy:', copyErr)); } } else if (news) { navigator.clipboard.writeText(news.sourceLink || window.location.href).then(() => alert('Link copiado!')).catch(err => console.error('Erro copy:', err)); }
-         };
-
-        if (!news) return null;
-
-        // --- Correção da Imagem Dupla ---
-        // Remove a primeira tag <img> do conteúdo HTML antes de renderizar
-        const cleanContentHtml = news.content?.replace(/<img[^>]*>/i, '') || "<p>Conteúdo não disponível.</p>";
-
-        // --- Destaques Reais ---
-        // Pega até 10 notícias do feed atual (exceto a notícia atual do modal)
-        const relatedNews = allNewsData
-                              .filter(item => item.id !== news.id) // Exclui a notícia atual
-                              .slice(0, 10); // Pega as 10 primeiras restantes
-
-        return (
-        <div className={`fixed inset-0 flex flex-col z-40 ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}>
-            {/* Header Fixo */}
-            <div className={`flex justify-between items-center p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-300 bg-gray-100"} sticky top-0 z-10`}>
-            <h2 className={`text-lg sm:text-xl font-bold line-clamp-1 ${isDarkMode ? "text-white" : "text-gray-800"}`}>{news.title}</h2>
-            <button onClick={onClose} title="Fechar" className={`p-1 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-400 hover:text-white hover:bg-gray-700" : "text-gray-600 hover:text-gray-800 hover:bg-gray-200"}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /> </svg> </button>
-            </div>
-
-            {/* Conteúdo Scrollável */}
-            <div className="p-5 overflow-y-auto flex-grow">
-            <div className="max-w-3xl mx-auto px-0 sm:px-4 lg:px-8">
-                {/* Meta Info */}
-                <div className="flex flex-wrap justify-between items-center mb-4 gap-2 text-xs">
-                    {/* ... meta info mantido ... */}
-                     <div className="flex items-center space-x-2"> {news.category && ( <span className={`text-white font-medium px-2 py-1 rounded-lg shadow ${isDarkMode ? "bg-blue-600" : "bg-blue-500"}`}> {news.category} </span> )} <p className={`font-medium ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>{news.source || "G1"}</p> </div> {news.date && <p className={`${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{news.date}</p>}
-                </div>
-
-                {/* Imagem Principal ÚNICA */}
-                <img src={news.image || PLACEHOLDER_IMAGE} alt={`Imagem para: ${news.title}`} className="w-full h-auto max-h-80 object-contain rounded-lg mb-5 shadow-md bg-gray-500" loading="lazy" onError={(e) => e.target.src = PLACEHOLDER_IMAGE} />
-
-                {/* Conteúdo Principal (HTML limpo) */}
-                <div
-                    // Adiciona classe para esconder imgs via CSS (precaução extra)
-                    className={`modal-content-prose prose prose-sm sm:prose-base max-w-none ${isDarkMode ? "prose-invert text-gray-300" : "text-gray-800"} [&_a]:text-blue-500 [&_a:hover]:underline`}
-                    dangerouslySetInnerHTML={{ __html: cleanContentHtml }}
-                />
-
-                {/* Ações */}
-                <div className={`flex flex-wrap justify-between items-center gap-3 mt-6 pt-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
-                    {/* ... botões de ação mantidos ... */}
-                     <button onClick={() => toggleFavorite(news.id)} title={isFavorited ? "Remover Favorito" : "Adicionar Favorito"} className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border ${ isFavorited ? (isDarkMode ? "text-red-500 border-red-500 hover:bg-red-900 hover:bg-opacity-20" : "text-red-600 border-red-600 hover:bg-red-100") : (isDarkMode ? "text-gray-400 border-gray-600 hover:text-red-400 hover:border-red-400" : "text-gray-600 border-gray-400 hover:text-red-600 hover:border-red-600") }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill={isFavorited ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={isFavorited ? 1 : 2}> <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /> </svg> Favorito </button> <button onClick={handleSpeakClick} title={isCurrentlySpeaking ? "Parar Leitura" : "Ouvir Notícia"} className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border ${ isCurrentlySpeaking ? (isDarkMode ? "text-yellow-400 border-yellow-400 hover:bg-yellow-900 hover:bg-opacity-30" : "text-yellow-600 border-yellow-600 hover:bg-yellow-100") : (isDarkMode ? "text-gray-400 border-gray-600 hover:text-blue-400 hover:border-blue-400" : "text-gray-600 border-gray-400 hover:text-blue-600 hover:border-blue-600") }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"> {isCurrentlySpeaking ? ( <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /> ) : ( <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15z" /> )} </svg> {isCurrentlySpeaking ? 'Parar' : 'Ouvir'} </button> <button onClick={handleShare} title="Compartilhar" className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border ${ isDarkMode ? "text-gray-400 border-gray-600 hover:text-blue-400 hover:border-blue-400" : "text-gray-600 border-gray-400 hover:text-blue-600 hover:border-blue-600" }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /> </svg> Compartilhar </button> <a href={news.sourceLink} target="_blank" rel="noopener noreferrer" className={`flex items-center justify-center text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${ isDarkMode ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600" }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /> </svg> Visitar fonte </a>
-                </div>
-
-                {/* Anúncio e Destaques Reais */}
-                <div className={`mt-8 pt-6 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
-                <div className="mb-6"> <AdBanner position="modal" isDarkMode={isDarkMode} /> </div>
-                {relatedNews.length > 0 && (
-                    <div>
-                    <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? "text-white" : "text-gray-800"}`}>Mais Notícias</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {relatedNews.map((relatedItem) => (
-                        <div
-                            key={relatedItem.id}
-                            className={`flex items-center p-3 rounded-lg shadow-md transition-all duration-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer ${
-                            isDarkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"
-                            }`}
-                            // Abre o modal com a notícia relacionada ao clicar
-                            onClick={() => onOpenModal(relatedItem)}
-                        >
-                            <img
-                            src={relatedItem.image || PLACEHOLDER_IMAGE}
-                            alt={relatedItem.title}
-                            className="w-16 h-16 object-cover rounded-lg mr-3 flex-shrink-0"
-                            loading="lazy" onError={(e) => e.target.src = PLACEHOLDER_IMAGE}
-                            />
-                            <div className="flex-grow min-w-0">
-                            <p className={`text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"} line-clamp-2`}>{relatedItem.title}</p>
-                            <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{relatedItem.source} • {relatedItem.category}</p>
-                            </div>
-                            <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ml-2 flex-shrink-0 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /> </svg>
-                        </div>
-                        ))}
-                    </div>
-                    </div>
-                )}
-                </div>
-            </div>
-            </div>
-        </div>
-        );
-    };
-
-
-    // --- Componente Principal (App) ---
-    const App = () => {
-      const [selectedNews, setSelectedNews] = React.useState(null);
-      const [isDarkMode, setIsDarkMode] = React.useState(true);
-      const [activeCategory, setActiveCategory] = React.useState("Todas");
-      const [searchQuery, setSearchQuery] = React.useState("");
-      const [sortBy, setSortBy] = React.useState("newest");
-      const [newsData, setNewsData] = React.useState([]); // Dados da categoria ATUAL
-      const [favoritedNews, setFavoritedNews] = React.useState(() => { /* ... */
-          const saved = localStorage.getItem('favoritedNews'); return saved ? new Set(JSON.parse(saved)) : new Set();
-       });
-      const [allFetchedNews, setAllFetchedNews] = React.useState({}); // Cache geral
-      const [showFavoritesOnly, setShowFavoritesOnly] = React.useState(false);
-      const [displayedNewsCount, setDisplayedNewsCount] = React.useState(12);
-      const [isLoading, setIsLoading] = React.useState(true);
-      const [error, setError] = React.useState(null);
-      const [showScrollTop, setShowScrollTop] = React.useState(false);
-      const [showPremiumModal, setShowPremiumModal] = React.useState(false);
-      const [currentlySpeakingId, setCurrentlySpeakingId] = React.useState(null);
-      const observer = React.useRef();
-
-      // Efeito inicial e de tema/favoritos (mantido)
-      React.useEffect(() => { /* ... */
-          speechManager.loadVoices(); const bodyClassList = document.body.classList; if (isDarkMode) { bodyClassList.add("bg-gray-900", "text-white"); bodyClassList.remove("bg-gray-100", "text-gray-800"); } else { bodyClassList.add("bg-gray-100", "text-gray-800"); bodyClassList.remove("bg-gray-900", "text-white"); } localStorage.setItem('favoritedNews', JSON.stringify(Array.from(favoritedNews)));
-       }, [isDarkMode, favoritedNews]);
-
-      // Fetch e Parse (mantido com proxy atualizado)
-      const fetchAndParseRss = async (category) => { /* ...código fetch mantido... */
-         speechManager.cancel(() => setCurrentlySpeakingId(null));
-         if (category === "Favoritos") { setActiveCategory("Favoritos"); setShowFavoritesOnly(true); setIsLoading(false); setError(null); const favoriteItems = Object.values(allFetchedNews).flat().filter(news => favoritedNews.has(news.id)).filter((news, index, self) => index === self.findIndex(n => n.id === news.id)); setNewsData(favoriteItems); setDisplayedNewsCount(favoriteItems.length); return; }
-         setShowFavoritesOnly(false); setActiveCategory(category); setIsLoading(true); setError(null); setNewsData([]); setDisplayedNewsCount(12);
-         const feedUrl = rssFeeds[category]; if (!feedUrl) { setError(`Feed para "${category}" não configurado.`); setIsLoading(false); return; }
-         const urlToFetch = CORS_PROXY + encodeURIComponent(feedUrl); console.log(`Fetching: ${urlToFetch}`);
-         try { const response = await fetch(urlToFetch); if (!response.ok) { let errDet = `status: ${response.status}`; try { const eTxt = await response.text(); if (eTxt.includes("Missing required parameter")) errDet += " (URL alvo?)" ; else if (eTxt.includes("rate limited")) errDet += " (Proxy ocupado)"; else errDet += ` - ${eTxt.substring(0,100)}...` } catch {} throw new Error(`Erro HTTP! ${errDet}. Proxy pode estar offline/bloqueado.`); } const xmlText = await response.text(); const parser = new DOMParser(); const xmlDoc = parser.parseFromString(xmlText, "application/xml"); const parserError = xmlDoc.querySelector("parsererror"); if (parserError) { if (xmlText.trim().startsWith('<') && !xmlText.trim().startsWith('<?xml')) console.warn("Resposta HTML, não XML."); throw new Error(`Erro XML ${category}: ${parserError.textContent}`); } const items = xmlDoc.querySelectorAll("item"); if (items.length === 0 && !xmlDoc.querySelector("channel")) throw new Error(`Nenhum item encontrado no feed ${category}.`); console.log(`Found ${items.length} items for ${category}`); const parsedNews = []; items.forEach((item, index) => { const title = item.querySelector("title")?.textContent || ""; const link = item.querySelector("link")?.textContent || ""; const guidElement = item.querySelector("guid"); const guid = guidElement?.textContent || link || `rss-${category}-${Date.now()}-${index}`; const pubDate = item.querySelector("pubDate")?.textContent || ""; const description = item.querySelector("description")?.textContent || ""; let image = null; const mediaContent = item.querySelector("media\\:content, content"); if (mediaContent) image = mediaContent.getAttribute("url"); else { const imgMatch = description.match(/<img src="([^"]+)"/); if (imgMatch?.[1]) image = imgMatch[1]; } parsedNews.push({ id: guid, source: "G1", title: title, image: image, date: formatDate(pubDate), pubDateRaw: pubDate, summary: stripHtml(description).substring(0, 150) + (stripHtml(description).length > 150 ? '...' : ''), content: description, sourceLink: link, category: category, }); }); setNewsData(parsedNews); setAllFetchedNews(prevCache => ({ ...prevCache, [category]: parsedNews })); } catch (err) { console.error("Falha fetch/parse:", err); setError(`Falha ao carregar ${category}. ${err.message}`); setNewsData([]); } finally { setIsLoading(false); }
-      };
-
-      // Efeito inicial
-      React.useEffect(() => {
-        fetchAndParseRss("Todas");
-      }, []);
-
-      // --- NOVO: Handler para o Botão Home ---
-      const handleGoHome = () => {
-          console.log("Going Home...");
-          speechManager.cancel(() => setCurrentlySpeakingId(null)); // Para fala
-          setSelectedNews(null); // Fecha modal se aberto
-          setSearchQuery(""); // Limpa busca
-          setSortBy("newest"); // Reseta ordenação
-          setDisplayedNewsCount(12); // Reseta contagem
-          // Se já estiver em "Todas", força o refresh, senão muda para "Todas"
-          if (activeCategory === "Todas") {
-              handleRefresh(); // Rebusca o feed "Todas"
-          } else {
-              fetchAndParseRss("Todas"); // Muda para categoria "Todas" (que já limpa e busca)
-          }
-      };
-
-
-      // Funções toggle e refresh (mantidas)
-      const toggleDarkMode = () => setIsDarkMode(prev => !prev);
-      const toggleFavorite = (newsId) => { /* ... */
-           setFavoritedNews(prev => { const newSet = new Set(prev); if (newSet.has(newsId)) newSet.delete(newsId); else newSet.add(newsId); return newSet; });
-      };
-      const handleRefresh = () => { /* ... */
-           console.log("Refreshing:", activeCategory); setSearchQuery(""); setSortBy("newest"); fetchAndParseRss(activeCategory);
-       };
-
-      // Load More e Filtro/Ordenação (mantidos)
-       const loadMoreNews = () => { /* ... */
-            if (showFavoritesOnly || displayedNewsCount >= filteredNews.length) return; setIsLoading(true); setTimeout(() => { const moreNewsToAdd = 12; setDisplayedNewsCount(prev => Math.min(prev + moreNewsToAdd, filteredNews.length)); setIsLoading(false); }, 300);
-       };
-       const filteredNews = React.useMemo(() => { /* ... */
-            let dataToFilter = showFavoritesOnly ? Object.values(allFetchedNews).flat().filter(news => favoritedNews.has(news.id)).filter((news, index, self) => index === self.findIndex(n => n.id === news.id)) : newsData; const searchedData = dataToFilter.filter(news => !searchQuery || news.title.toLowerCase().includes(searchQuery.toLowerCase()) || (news.summary && news.summary.toLowerCase().includes(searchQuery.toLowerCase())) ); return [...searchedData].sort((a, b) => { const parseDate = (dateStr) => { try { return new Date(dateStr || 0); } catch { return new Date(0); } }; if (sortBy === "newest") return parseDate(b.pubDateRaw || b.date) - parseDate(a.pubDateRaw || a.date); if (sortBy === "oldest") return parseDate(a.pubDateRaw || a.date) - parseDate(b.pubDateRaw || b.date); if (sortBy === "title-asc") return a.title.localeCompare(b.title); if (sortBy === "title-desc") return b.title.localeCompare(a.title); return 0; });
-        }, [showFavoritesOnly ? favoritedNews : newsData, allFetchedNews, searchQuery, sortBy]);
-
-      const newsToDisplay = filteredNews.slice(0, displayedNewsCount);
-
-      // Scroll e AdCard (mantidos)
-      const lastNewsElementRef = React.useCallback(node => { /* ... */
-           if (isLoading || showFavoritesOnly) return; if (observer.current) observer.current.disconnect(); observer.current = new IntersectionObserver(entries => { if (entries[0].isIntersecting && displayedNewsCount < filteredNews.length) { loadMoreNews(); } }, { threshold: 0.5 }); if (node) observer.current.observe(node);
-      }, [isLoading, showFavoritesOnly, displayedNewsCount, filteredNews.length]);
-      const handleScroll = () => setShowScrollTop(window.scrollY > 300);
-      const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
-      React.useEffect(() => { window.addEventListener("scroll", handleScroll); return () => window.removeEventListener("scroll", handleScroll); }, []);
-      const itemsToRender = []; const adInsertionIndex = 4; newsToDisplay.forEach((news, index) => { itemsToRender.push( <div key={news.id} ref={index === newsToDisplay.length - 1 ? lastNewsElementRef : null} > <NewsCard news={news} onOpenModal={setSelectedNews} isDarkMode={isDarkMode} toggleFavorite={toggleFavorite} isFavorited={favoritedNews.has(news.id)} currentlySpeakingId={currentlySpeakingId} setCurrentlySpeakingId={setCurrentlySpeakingId} /> </div> ); if (index === adInsertionIndex - 1 && newsToDisplay.length >= adInsertionIndex) { itemsToRender.push(<AdCard key="ad-card-middle" isDarkMode={isDarkMode} />); } });
-
-
-      // --- Renderização do App ---
+    // Placeholder for Banner AdMob
+    const AdMobBannerPlaceholder = ({ position, adUnitId, isDarkMode, adType = "Banner" }) => {
+      const positionTextMap = { top: "Topo", modal: "Modal", "premium-modal": "Premium", footer: "Rodapé" };
+      const title = `${adType === 'Native' ? 'Nativo' : 'Banner'} AdMob - ${positionTextMap[position] || position}`;
+      const description = `Aqui será exibido um anúncio ${adType} AdMob. (ID: ${adUnitId || 'N/A - Teste'})`;
       return (
-        <div className={`flex flex-col min-h-screen transition-colors duration-300 ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"}`}>
-           {/* Header com Botão Home */}
-           <header className={`p-4 sticky top-0 z-20 shadow-lg ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}>
-             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-               <div className="flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4">
-                 <div className="flex items-center flex-shrink-0">
-                   <h1 className={`font-bold text-xl sm:text-2xl tracking-tight ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>NewsFlow</h1>
-                 </div>
-                 <div className="flex items-center space-x-2 sm:space-x-3">
-                    {/* --- NOVO: Botão Home --- */}
-                     <button
-                        onClick={handleGoHome}
-                        title="Início (Todas as Notícias)"
-                        className={`p-2 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-blue-400" : "text-gray-700 hover:bg-gray-300 hover:text-blue-600"}`}
-                        >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                        </svg>
-                    </button>
-                    {/* Contador */}
-                    <span title={`${newsToDisplay.length} notícias`} className={`news-count-badge flex items-center justify-center text-xs font-semibold px-2.5 py-1 rounded-full ${isDarkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-300 text-gray-700'}`}>
-                        {isLoading && !showFavoritesOnly ? ( <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75"></path></svg> ) : ( newsToDisplay.length )}
-                    </span>
-                    {/* Dark Mode */}
-                    <button onClick={toggleDarkMode} title={isDarkMode ? "Modo Claro" : "Modo Escuro"} className={`p-2 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-yellow-400" : "text-gray-700 hover:bg-gray-300 hover:text-blue-600"}`}>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">{isDarkMode ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /> : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />}</svg>
-                    </button>
-                    {/* Premium */}
-                    <button onClick={() => setShowPremiumModal(true)} title="Premium" className={`p-2 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-green-400" : "text-gray-700 hover:bg-gray-300 hover:text-green-600"}`}>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18L12 6M12 18L9 15M12 18L15 15M12 6L9 9M12 6L15 9M5 21H19C20.1046 21 21 20.1046 21 19V5C21 3.89543 20.1046 3 19 3H5C3.89543 3 3 3.89543 3 5V19C3 20.1046 3.89543 21 5 21Z" /></svg>
-                    </button>
-                    {/* Favoritos */}
-                    <button onClick={() => fetchAndParseRss(activeCategory === "Favoritos" ? "Todas" : "Favoritos")} title={activeCategory === "Favoritos" ? "Todas" : "Favoritos"} className={`p-2 rounded-full transition-colors duration-200 ${activeCategory === "Favoritos" ? (isDarkMode ? "text-red-500 bg-red-900 bg-opacity-30" : "text-red-600 bg-red-100") : (isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-red-400" : "text-gray-700 hover:bg-gray-300 hover:text-red-600")}`}>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={activeCategory === "Favoritos" ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={activeCategory === "Favoritos" ? 1 : 2}> <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /> </svg>
-                    </button>
-                    {/* Configurações */}
-                    <button onClick={() => alert('Configurações...')} title="Configurações" className={`p-2 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-blue-400" : "text-gray-700 hover:bg-gray-300 hover:text-blue-600"}`} >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"> <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /> <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /> </svg>
-                    </button>
-                 </div>
-               </div>
-             </div>
-           </header>
-
-           {/* Navegação, Anúncio, Busca */}
-           <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-             <Navigation onCategoryChange={fetchAndParseRss} activeCategory={activeCategory} isDarkMode={isDarkMode} />
-             <AdBanner position="top" isDarkMode={isDarkMode} />
-             <SearchAndFilters searchQuery={searchQuery} setSearchQuery={setSearchQuery} sortBy={sortBy} setSortBy={setSortBy} handleRefresh={handleRefresh} isDarkMode={isDarkMode} isLoading={isLoading && !showFavoritesOnly} />
-           </div>
-
-           {/* Conteúdo Principal (Grid) */}
-           <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 flex-grow">
-             {/* ... Mensagem de Erro, Grid, Loading, Fim das Notícias ... */}
-              {error && ( <div className={`p-4 mb-6 rounded-lg text-center ${isDarkMode ? 'bg-red-800 text-red-100' : 'bg-red-100 text-red-700'}`}> <p className="font-bold text-lg mb-2">Ops! Algo deu errado.</p> <p className="text-sm">{error}</p> <button onClick={handleRefresh} className={`mt-3 px-4 py-1.5 rounded text-sm font-medium ${isDarkMode ? 'bg-red-600 hover:bg-red-500' : 'bg-red-200 hover:bg-red-300'}`}>Tentar Novamente</button> </div> )}
-             {isLoading && itemsToRender.length === 0 && !showFavoritesOnly && !error ? ( <div className="text-center py-10"> <p className={`text-xl font-semibold mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Carregando {activeCategory}...</p> <svg className={`animate-spin mx-auto h-10 w-10 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"> <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75"></path> </svg> </div> ) : itemsToRender.length > 0 ? ( <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"> {itemsToRender} </div> ) : !isLoading && !error ? ( <p className={`text-center py-10 text-lg ${isDarkMode ? "text-gray-500" : "text-gray-600"}`}> Nenhuma notícia encontrada para "{activeCategory}"{searchQuery ? ` com "${searchQuery}"` : ''}. </p> ) : null}
-             {isLoading && itemsToRender.length > 0 && !showFavoritesOnly && ( <div className="text-center py-6 mt-6"> <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Carregando mais...</p> </div> )}
-             {!isLoading && displayedNewsCount >= filteredNews.length && filteredNews.length > 0 && !showFavoritesOnly && ( <div className="text-center py-10 mt-6"> <p className={`text-lg font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Fim das notícias.</p> </div> )}
-             {showFavoritesOnly && filteredNews.length > 0 && ( <div className="text-center py-10 mt-6"> <p className={`text-lg font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Exibindo {filteredNews.length} favorito(s).</p> </div> )}
-             {showFavoritesOnly && filteredNews.length === 0 && !isLoading && ( <div className="text-center py-10 mt-6"> <p className={`text-lg font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Você ainda não tem favoritos.</p><p className={`text-sm ${isDarkMode ? "text-gray-500" : "text-gray-600"}`}>Clique no ❤️ para adicionar.</p> </div> )}
-           </main>
-
-           {/* Anúncio Inferior e Footer */}
-           <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6"> <AdBanner position="footer" isDarkMode={isDarkMode} /> </div>
-           <footer className={`w-full py-6 mt-auto ${isDarkMode ? 'bg-gray-800' : 'bg-gray-200'}`}> <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center"> <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}> © {new Date().getFullYear()} NewsFlow por João Ricardo <a href="https://www.instagram.com/joaoricardo.pe" target="_blank" rel="noopener noreferrer" className={`font-medium hover:underline ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}> @joaoricardo.pe </a> </p> </div> </footer>
-
-           {/* Botão Scroll-to-Top */}
-           {showScrollTop && ( <button onClick={scrollToTop} title="Voltar ao topo" className={`fixed bottom-6 right-6 p-3 rounded-full shadow-lg transition-all duration-300 z-30 ${isDarkMode ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-blue-500 text-white hover:bg-blue-600"}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" /></svg> </button> )}
-
-           {/* Modais */}
-           <NewsModal
-                news={selectedNews}
-                // Passa os dados da categoria ATUAL para os destaques
-                allNewsData={newsData}
-                onClose={() => { if (selectedNews && currentlySpeakingId === selectedNews.id) { speechManager.cancel(() => setCurrentlySpeakingId(null)); } setSelectedNews(null); }}
-                isDarkMode={isDarkMode}
-                toggleFavorite={toggleFavorite}
-                isFavorited={selectedNews ? favoritedNews.has(selectedNews.id) : false}
-                onOpenModal={setSelectedNews} // Permite abrir outros modais a partir dos destaques
-                currentlySpeakingId={currentlySpeakingId}
-                setCurrentlySpeakingId={setCurrentlySpeakingId}
-            />
-           {showPremiumModal && ( <PremiumAdModal onClose={() => setShowPremiumModal(false)} isDarkMode={isDarkMode} /> )}
+        <div className={`py-3 px-4 rounded-lg shadow text-center ${isDarkMode ? "bg-gray-700 text-gray-200 border border-dashed border-gray-500" : "bg-gray-100 text-gray-800 border border-dashed border-gray-300"}`}>
+          <p className="text-sm font-semibold">{title}</p>
+          <p className="text-xs mt-1">{description}</p>
+          <a href="#" className={`inline-block mt-2 px-3 py-1 rounded text-xs font-medium transition-colors duration-200 ${isDarkMode ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-blue-500 text-white hover:bg-blue-600"}`} onClick={(e) => {e.preventDefault(); console.log(`Ad placeholder clicked: ${adUnitId}`)}} >
+            Anúncio Teste
+          </a>
         </div>
       );
     };
 
-    // Renderiza
-    const root = ReactDOM.createRoot(document.getElementById("root"));
-    root.render(<App />);
+    // Placeholder for Native Advanced AdMob (styled like a NewsCard)
+    const AdMobNativeAdvancedCard = ({ adUnitId, isDarkMode }) => {
+        const hoverBorderColorClass = isDarkMode ? 'hover:border-green-400' : 'hover:border-green-500';
+        return (
+          <div className={`news-card-hover ${hoverBorderColorClass} rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transform hover:-translate-y-1 flex flex-col h-full cursor-pointer ${isDarkMode ? "bg-gray-800" : "bg-white"}`} role="article" aria-label="Publicidade">
+            <div className="relative">
+              <div className={`w-full h-48 sm:h-56 md:h-64 flex items-center justify-center ${isDarkMode ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                 <svg xmlns="http://www.w3.org/2000/svg" className={`h-12 w-12 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              </div>
+               <span className={`absolute top-2 left-2 text-white text-xs font-medium px-2 py-1 rounded-lg shadow ${isDarkMode ? "bg-green-600" : "bg-green-500"}`}>
+                Publicidade
+              </span>
+            </div>
+            <div className="p-5 flex flex-col flex-grow">
+                <div className="flex justify-between items-center mb-2 text-xs">
+                    <p className={`font-medium ${isDarkMode ? "text-green-400" : "text-green-600"}`}>Anunciante</p>
+                    <p className={`${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>ID: {adUnitId || 'N/A - Teste'}</p>
+                </div>
+                <h3 className={`text-lg font-semibold line-clamp-3 mb-2 flex-grow ${isDarkMode ? "text-white" : "text-gray-900"}`}>Título do Anúncio Nativo</h3>
+                <p className={`text-sm line-clamp-2 mt-1 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>Descrição curta e chamativa do anúncio que apareceria aqui.</p>
+                <div className={`flex justify-end items-center mt-4 pt-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                     <a href="#" onClick={(e) => {e.preventDefault(); console.log(`Native Ad placeholder clicked: ${adUnitId}`)}} className={`inline-block px-4 py-1.5 rounded-lg text-sm font-medium transition-colors duration-200 ${ isDarkMode ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-blue-500 text-white hover:bg-blue-600" }`} >
+                        Saiba Mais
+                     </a>
+                </div>
+            </div>
+          </div>
+        );
+    };
+
+     // Modal for Premium options / Rewarded Ad simulation
+     const PremiumAdModal = ({ onClose, isDarkMode, adUnitId }) => {
+         const [isLoadingAd, setIsLoadingAd] = React.useState(false);
+         const [rewardGranted, setRewardGranted] = React.useState(false);
+
+         const handleBuyPremium = () => { alert("Funcionalidade de compra Premium não implementada (simulação)."); onClose(); };
+
+         // Simulates watching a rewarded ad
+         const handleWatchAds = async () => {
+             setIsLoadingAd(true);
+             setRewardGranted(false);
+             console.log("Attempting to load Rewarded Ad (ID:", adUnitId, ")");
+             // Simulate ad loading delay
+             await new Promise(resolve => setTimeout(resolve, 1500));
+
+             // Simulate success/failure (50% chance of failure for testing)
+             const adSuccess = Math.random() > 0.5;
+
+             if (adSuccess) {
+                 console.log("Rewarded Ad 'shown' successfully.");
+                 // Simulate user watching the ad
+                 await new Promise(resolve => setTimeout(resolve, 2000));
+                 console.log("Reward granted!");
+                 setRewardGranted(true);
+                 setIsLoadingAd(false);
+                 // Close modal after success and message
+                 setTimeout(() => {
+                    alert("Você assistiu 4 anúncios (simulado)! Acesso Premium temporário liberado (simulação).");
+                    // Here you would typically set a flag in app state/localStorage for temporary premium access
+                    onClose();
+                 }, 1000);
+             } else {
+                 console.error("Failed to load/show Rewarded Ad (simulated).");
+                 setIsLoadingAd(false);
+                 alert("Não foi possível carregar o anúncio premiado no momento. Tente novamente mais tarde.");
+             }
+         };
+
+         return (
+             <div className={`fixed inset-0 flex items-center justify-center z-50 ${isDarkMode ? "bg-gray-900 bg-opacity-80" : "bg-gray-500 bg-opacity-75"}`} aria-modal="true" role="dialog">
+                 <div className={`rounded-lg shadow-xl p-6 max-w-md w-full ${isDarkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}>
+                     <div className="flex justify-between items-center mb-4">
+                         <h2 className="text-xl font-bold">NewsFlow Premium!</h2>
+                         <button onClick={onClose} className={`p-1 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-400 hover:text-white hover:bg-gray-700" : "text-gray-600 hover:text-gray-800 hover:bg-gray-200"}`} aria-label="Fechar">
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /> </svg>
+                         </button>
+                     </div>
+                     <p className={`text-sm mb-4 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>Remova os anúncios e apoie o desenvolvimento! Escolha uma opção:</p>
+                     {/* Placeholder for an ad inside the premium modal (can be Native or Banner) */}
+                     <div className="mb-6">
+                        <AdMobBannerPlaceholder
+                            position="premium-modal"
+                            adType="Native" // Or Banner
+                            adUnitId={ADMOB_TEST_IDS.NATIVE_ADVANCED} // Use a relevant test ID
+                            isDarkMode={isDarkMode}
+                        />
+                     </div>
+                     <div className="flex flex-col space-y-4">
+                         <button onClick={handleBuyPremium} disabled={isLoadingAd} className={`w-full px-5 py-3 rounded-lg text-sm font-medium transition-colors duration-200 disabled:opacity-60 disabled:cursor-not-allowed ${ isDarkMode ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-blue-500 text-white hover:bg-blue-600" }`} > Comprar Acesso Premium (Simulação) </button>
+                         <button onClick={handleWatchAds} disabled={isLoadingAd || rewardGranted} className={`w-full px-5 py-3 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center justify-center disabled:opacity-60 disabled:cursor-not-allowed ${ isDarkMode ? "bg-gray-600 text-white hover:bg-gray-500" : "bg-gray-300 text-gray-800 hover:bg-gray-400" }`} >
+                            {isLoadingAd ? (
+                                <>
+                                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"> <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle> <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path> </svg>
+                                Carregando Anúncio...
+                                </>
+                            ) : rewardGranted ? (
+                                "Recompensa Concedida!"
+                            ) : (
+                                "Ver 4 Ads (Grátis 24h - Simulação)"
+                            )}
+                         </button>
+                         {/* Display the Test Ad ID being used */}
+                         <p className={`text-xs text-center ${isDarkMode ? 'text-gray-500' : 'text-gray-500'}`}>
+                           (Usando AdMob Premiado Teste: {adUnitId || 'N/A'})
+                         </p>
+                     </div>
+                 </div>
+             </div>
+         );
+      };
+
+
+    // --- Core UI Components ---
+    const Navigation = ({ onCategoryChange, activeCategory, isDarkMode, rssFeeds }) => {
+         const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+         // Get category names (keys) from the provided rssFeeds object
+         const feedCategories = Object.keys(rssFeeds || {}); // Handle case where rssFeeds might be null/undefined initially
+
+         const navItems = [
+            // Dynamically add items based on the keys of the active rssFeeds object
+            ...feedCategories.map(label => ({
+                label: label,
+                // Simplified icon mapping (add more as needed)
+                icon: {
+                    "Todas": "M3 12h18M3 6h18M3 18h18", "Brasil": "M3 21v-2a4 4 0 014-4h10a4 4 0 014 4v2M12 3a4 4 0 00-4 4v2a4 4 0 004 4h0a4 4 0 004-4V7a4 4 0 00-4-4z", "Carros": "M19 7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7z", "Ciência e Saúde": "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z", "Concursos": "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2", "Economia": "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z", "Mundo": "M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z", "Música": "M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z", "Natureza": "M17.657 18.657l-4.243-4.243M6.343 5.343l4.243 4.243m11.314-4.243l-4.243 4.243M6.343 18.657l4.243-4.243M12 16a4 4 0 110-8 4 4 0 010 8z", // Corrected Natureza icon
+                    "Planeta Bizarro": "M12 14l9-5-9-5-9 5 9 5zm0 7l9-5-9-5-9 5 9 5z", "Política": "M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z", "Pop & Arte": "M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z", "Tecnologia": "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z", "Turismo": "M17.657 4.343a8 8 0 11-11.314 11.314L12 21.213l5.657-5.556a8 8 0 010-11.314zM12 12a3 3 0 100-6 3 3 0 000 6z"
+                }[label] || "M6 20V4a2 2 0 012-2h10a2 2 0 012 2v16l-3-2-4 3-4-3-3 2z" // Default icon
+            })),
+            // Add Favorites button manually
+            { label: "Favoritos", icon: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z", iconClass: isDarkMode ? "text-red-500" : "text-red-600" }
+         ];
+
+         return (
+            <nav className={`p-4 rounded-lg shadow-lg ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}>
+                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex justify-between items-center sm:hidden">
+                        <span className={`font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Categorias</span>
+                        <button onClick={() => setIsMenuOpen(!isMenuOpen)} className={`p-2 rounded-lg ${isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-700 hover:bg-gray-300"}`} aria-expanded={isMenuOpen} aria-controls="mobile-menu">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={isMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} />
+                            </svg>
+                        </button>
+                    </div>
+                    {/* Mobile Menu */}
+                    {isMenuOpen && (
+                        <div id="mobile-menu" className="sm:hidden mt-2 space-y-1">
+                            {navItems.map((item, index) => (
+                                <button key={index} onClick={() => { onCategoryChange(item.label); setIsMenuOpen(false); }} className={`flex items-center w-full p-3 rounded-lg transition-all duration-200 text-left ${ activeCategory === item.label ? (isDarkMode ? "bg-blue-600 text-white" : "bg-blue-500 text-white") : (isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-700 hover:bg-gray-300") }`} >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 flex-shrink-0 ${item.iconClass || ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} /> </svg>
+                                    <span className="ml-3 text-sm font-medium">{item.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    {/* Desktop Menu */}
+                    <div className="hidden sm:flex flex-wrap justify-center gap-2">
+                        {navItems.map((item, index) => (
+                            <button key={index} onClick={() => onCategoryChange(item.label)} title={item.label} className={`flex items-center p-2 rounded-lg transition-all duration-300 group relative ${ activeCategory === item.label ? (isDarkMode ? "bg-blue-600 text-white shadow-md" : "bg-blue-500 text-white shadow-md") : (isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-blue-400" : "text-gray-700 hover:bg-gray-300 hover:text-blue-600") }`} >
+                                <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 flex-shrink-0 ${item.iconClass || ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} /> </svg>
+                                <span className="ml-2 text-sm font-medium hidden md:inline">{item.label}</span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </nav>
+         );
+     };
+
+    const SearchAndFilters = ({ searchQuery, setSearchQuery, sortBy, setSortBy, handleRefresh, isDarkMode, isLoading }) => {
+        return (
+        <div className={`p-4 rounded-lg shadow-md ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                {/* Search Input */}
+                <div className="flex-grow relative">
+                    <label htmlFor="search-input" className="sr-only">Buscar notícias</label>
+                    <input id="search-input" type="text" placeholder="Buscar notícias..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full h-10 p-3 pl-10 rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${ isDarkMode ? "bg-gray-700 text-white placeholder-gray-400 focus:ring-blue-500" : "bg-gray-300 text-gray-800 placeholder-gray-600 focus:ring-blue-400" }`} />
+                    <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /> </svg>
+                </div>
+                {/* Sort Select & Refresh Button */}
+                <div className="flex flex-row gap-3 items-center flex-shrink-0 w-full sm:w-auto">
+                    <label htmlFor="sort-select" className="sr-only">Ordenar por</label>
+                    <select id="sort-select" value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={`h-10 p-2 rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 flex-grow sm:flex-grow-0 ${ isDarkMode ? "bg-gray-700 text-white focus:ring-blue-500" : "bg-gray-300 text-gray-800 focus:ring-blue-400" }`} >
+                        <option value="newest">Mais Recentes</option>
+                        <option value="oldest">Mais Antigos</option>
+                        <option value="title-asc">Título A-Z</option>
+                        <option value="title-desc">Título Z-A</option>
+                    </select>
+                    <button onClick={handleRefresh} disabled={isLoading} title="Atualizar Feed" className={`h-10 flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex-shrink-0 ${ isDarkMode ? "bg-blue-500 text-white hover:bg-blue-600 disabled:bg-blue-700 disabled:opacity-70 disabled:cursor-not-allowed" : "bg-blue-400 text-white hover:bg-blue-500 disabled:bg-blue-300 disabled:opacity-70 disabled:cursor-not-allowed" }`} >
+                        {isLoading ? ( <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"> <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle> <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path> </svg> ) : ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /> </svg> )}
+                        <span className="hidden sm:inline ml-2">{isLoading ? 'Atualizando...' : 'Atualizar'}</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+        );
+     };
+
+    // News Card Component (using forwardRef for IntersectionObserver)
+    const NewsCard = React.forwardRef(({ news, onOpenModal, isDarkMode, toggleFavorite, isFavorited, currentlySpeakingId, setCurrentlySpeakingId }, ref) => {
+         const isCurrentlySpeaking = news.id === currentlySpeakingId;
+         const handleSpeakClick = (event) => {
+             event.stopPropagation(); // Prevent card click
+             if (!news.title) return;
+             // If already speaking this item, cancel it. Otherwise, speak it.
+             if (isCurrentlySpeaking) {
+                 speechManager.cancel(() => setCurrentlySpeakingId(null));
+             } else {
+                 speechManager.speak(news.title, news.id, () => {
+                     // Callback when speech ends naturally or is cancelled
+                     setCurrentlySpeakingId(null);
+                 });
+                 // Update state immediately to reflect speaking attempt
+                 setCurrentlySpeakingId(news.id);
+             }
+         };
+         const handleFavoriteClick = (event) => {
+             event.stopPropagation(); // Prevent card click
+             toggleFavorite(news.id);
+         };
+
+         const hoverBorderColorClass = isDarkMode ? 'hover:border-blue-400' : 'hover:border-blue-500';
+         return (
+            <div ref={ref} // Attach the ref here for IntersectionObserver
+                 className={`news-card-hover ${hoverBorderColorClass} rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transform hover:-translate-y-1 flex flex-col h-full cursor-pointer ${isDarkMode ? "bg-gray-800" : "bg-white"}`}
+                 onClick={() => onOpenModal(news)}
+                 role="article"
+                 aria-labelledby={`news-title-${news.id}`} >
+                 <div className="relative">
+                     <img src={news.image || PLACEHOLDER_IMAGE} alt={`Imagem para: ${news.title || 'Notícia sem título'}`} className="w-full h-48 object-cover sm:h-56 md:h-64" loading="lazy" onError={(e) => e.target.src = PLACEHOLDER_IMAGE} />
+                     {news.category && ( <span className={`absolute top-2 left-2 text-white text-xs font-medium px-2 py-1 rounded-lg shadow ${isDarkMode ? "bg-blue-600" : "bg-blue-500"}`}> {news.category} </span> )}
+                 </div>
+                 <div className="p-5 flex flex-col flex-grow">
+                     <div className="flex justify-between items-center mb-2 text-xs">
+                         <p className={`font-medium ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>{news.source || "Fonte Desconhecida"}</p>
+                         {news.date && <p className={`${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{news.date}</p>}
+                     </div>
+                     <h3 id={`news-title-${news.id}`} className={`text-lg font-semibold line-clamp-3 mb-2 flex-grow ${isDarkMode ? "text-white" : "text-gray-900"}`}>{news.title || "Sem Título"}</h3>
+                     {news.summary && <p className={`text-sm line-clamp-2 mt-1 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>{news.summary}</p>}
+                     <div className={`flex justify-between items-center mt-4 pt-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                         <button onClick={handleFavoriteClick} title={isFavorited ? "Remover dos Favoritos" : "Adicionar aos Favoritos"} className={`flex items-center p-2 rounded-full transition-colors duration-200 ${ isFavorited ? (isDarkMode ? "text-red-500 hover:bg-red-900 hover:bg-opacity-20" : "text-red-600 hover:bg-red-100") : (isDarkMode ? "text-gray-400 hover:text-red-400 hover:bg-gray-700" : "text-gray-600 hover:text-red-600 hover:bg-gray-200") }`} >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={isFavorited ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={isFavorited ? 1 : 2}> <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /> </svg>
+                         </button>
+                         <button onClick={handleSpeakClick} title={isCurrentlySpeaking ? "Parar Leitura do Título" : "Ouvir Título"} className={`flex items-center p-2 rounded-full transition-colors duration-200 ${ isCurrentlySpeaking ? (isDarkMode ? "text-yellow-400 bg-yellow-900 bg-opacity-30" : "text-yellow-600 bg-yellow-100") : (isDarkMode ? "text-gray-400 hover:text-blue-400 hover:bg-gray-700" : "text-gray-600 hover:text-blue-600 hover:bg-gray-200") }`} >
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                 {isCurrentlySpeaking ? ( <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /> ) : ( <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15z" /> )}
+                             </svg>
+                         </button>
+                     </div>
+                 </div>
+            </div>
+         );
+     });
+
+    // News Modal Component
+    const NewsModal = ({ news, allNewsData, onClose, isDarkMode, toggleFavorite, isFavorited, onOpenModal, currentlySpeakingId, setCurrentlySpeakingId, adSettings }) => {
+        // Stop speech synthesis for this item when the modal closes
+        React.useEffect(() => {
+            return () => {
+                if (currentlySpeakingId && news && currentlySpeakingId === news.id) {
+                    speechManager.cancel(() => setCurrentlySpeakingId(null)); // Ensure state updates
+                }
+            };
+        }, [currentlySpeakingId, news?.id, setCurrentlySpeakingId]); // Re-run if the specific news item changes
+
+        const handleSpeakClick = () => {
+            if (!news?.content && !news?.title) return;
+            const textToSpeak = `${news.title || ''}. ${stripHtml(news.content || '')}`;
+            if (!textToSpeak.trim() || textToSpeak.trim() === '.') return;
+
+            // If already speaking this item, cancel it. Otherwise, speak it.
+            if (news.id === currentlySpeakingId) {
+                 speechManager.cancel(() => setCurrentlySpeakingId(null));
+            } else {
+                 speechManager.speak(textToSpeak, news.id, () => {
+                     // Callback when speech ends naturally or is cancelled
+                     setCurrentlySpeakingId(null);
+                 });
+                 // Update state immediately to reflect speaking attempt
+                 setCurrentlySpeakingId(news.id);
+             }
+        };
+
+        const handleShare = async () => {
+            if (!news) return;
+            const shareData = {
+                title: news.title || "Notícia NewsFlow",
+                text: news.summary || stripHtml(news.content || '').substring(0, 150) + (stripHtml(news.content || '').length > 150 ? '...' : ''),
+                url: news.sourceLink || window.location.href,
+            };
+            try {
+                if (navigator.share) {
+                    await navigator.share(shareData);
+                    console.log('Shared successfully');
+                } else if (navigator.clipboard) {
+                     await navigator.clipboard.writeText(shareData.url);
+                     alert('Link da notícia copiado para a área de transferência!');
+                } else {
+                    alert('Compartilhamento não suportado neste navegador. Link: ' + shareData.url);
+                }
+            } catch (err) {
+                console.error('Share/Copy error:', err);
+                 // Fallback to clipboard writeText if share fails, just in case
+                 if (navigator.clipboard) {
+                    try { await navigator.clipboard.writeText(shareData.url); alert('Falha ao compartilhar. Link copiado para a área de transferência!'); }
+                    catch (copyErr) { console.error('Clipboard fallback error:', copyErr); alert('Falha ao compartilhar ou copiar o link.'); }
+                 } else {
+                    alert('Falha ao compartilhar.');
+                 }
+            }
+        };
+
+        const handleFavoriteClick = (event) => {
+             event.stopPropagation(); // Although not strictly needed here, good practice
+             toggleFavorite(news.id);
+        };
+
+        if (!news) return null;
+
+        const isCurrentlySpeaking = news.id === currentlySpeakingId;
+        // Remove only <img> tags from content, keep other HTML for formatting
+        const cleanContentHtml = news.content?.replace(/<img[^>]*>/gi, '') || "<p>Conteúdo não disponível.</p>";
+        // Find related news (simple logic: different ID, same category if possible, limit 4)
+        const relatedNews = allNewsData
+            .filter(item => item.id !== news.id)
+            .sort((a, b) => (a.category === news.category ? -1 : 1)) // Prioritize same category
+            .slice(0, 4); // Limit number of related items
+
+        return (
+        <div className={`fixed inset-0 flex flex-col z-40 transition-colors duration-300 ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`} aria-modal="true" role="dialog" aria-labelledby="modal-title">
+            {/* Fixed Header */}
+            <div className={`flex justify-between items-center p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-300 bg-gray-100"} sticky top-0 z-10`}>
+                <h2 id="modal-title" className={`text-lg sm:text-xl font-bold line-clamp-1 mr-4 ${isDarkMode ? "text-white" : "text-gray-800"}`}>{news.title || "Detalhes da Notícia"}</h2>
+                <button onClick={onClose} title="Fechar" className={`p-1 rounded-full transition-colors duration-200 flex-shrink-0 ${isDarkMode ? "text-gray-400 hover:text-white hover:bg-gray-700" : "text-gray-600 hover:text-gray-800 hover:bg-gray-200"}`}>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /> </svg>
+                </button>
+            </div>
+
+            {/* Scrollable Content Area */}
+            <div className="p-5 overflow-y-auto flex-grow">
+                <div className="max-w-3xl mx-auto px-0 sm:px-4 lg:px-8">
+                     {/* Meta Info */}
+                     <div className="flex flex-wrap justify-between items-center mb-4 gap-2 text-xs">
+                         <div className="flex items-center space-x-2">
+                            {news.category && ( <span className={`text-white font-medium px-2 py-1 rounded-lg shadow ${isDarkMode ? "bg-blue-600" : "bg-blue-500"}`}> {news.category} </span> )}
+                            <p className={`font-medium ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>{news.source || "Fonte Desconhecida"}</p>
+                         </div>
+                         {news.date && <p className={`${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{news.date}</p>}
+                     </div>
+                     {/* Main Image (if available) */}
+                     {news.image && <img src={news.image} alt={`Imagem para: ${news.title || 'Notícia sem título'}`} className="w-full h-auto max-h-80 object-contain rounded-lg mb-5 shadow-md bg-gray-500" loading="lazy" onError={(e) => e.target.style.display='none'} />} {/* Hide if error */}
+
+                     {/* Main Content (using typography plugin styles) */}
+                     <div className={`modal-content-prose prose prose-sm sm:prose-base max-w-none ${isDarkMode ? "prose-invert text-gray-300" : "text-gray-800"} [&_a]:text-blue-500 [&_a:hover]:underline [&_p]:mb-3`} dangerouslySetInnerHTML={{ __html: cleanContentHtml }} />
+
+                     {/* Action Buttons */}
+                     <div className={`flex flex-wrap justify-start items-center gap-3 mt-6 pt-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
+                        <button onClick={handleFavoriteClick} title={isFavorited ? "Remover dos Favoritos" : "Adicionar aos Favoritos"} className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border ${ isFavorited ? (isDarkMode ? "text-red-500 border-red-500 hover:bg-red-900 hover:bg-opacity-20" : "text-red-600 border-red-600 hover:bg-red-100") : (isDarkMode ? "text-gray-400 border-gray-600 hover:text-red-400 hover:border-red-400" : "text-gray-600 border-gray-400 hover:text-red-600 hover:border-red-600") }`} >
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill={isFavorited ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={isFavorited ? 1 : 2}> <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /> </svg> Favorito
+                         </button>
+                         <button onClick={handleSpeakClick} title={isCurrentlySpeaking ? "Parar Leitura da Notícia" : "Ouvir Notícia"} className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border ${ isCurrentlySpeaking ? (isDarkMode ? "text-yellow-400 border-yellow-400 hover:bg-yellow-900 hover:bg-opacity-30" : "text-yellow-600 border-yellow-600 hover:bg-yellow-100") : (isDarkMode ? "text-gray-400 border-gray-600 hover:text-blue-400 hover:border-blue-400" : "text-gray-600 border-gray-400 hover:text-blue-600 hover:border-blue-600") }`} >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                 {isCurrentlySpeaking ? ( <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /> ) : ( <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15z" /> )}
+                             </svg> {isCurrentlySpeaking ? 'Parar' : 'Ouvir'}
+                         </button>
+                         <button onClick={handleShare} title="Compartilhar Notícia" className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border ${ isDarkMode ? "text-gray-400 border-gray-600 hover:text-blue-400 hover:border-blue-400" : "text-gray-600 border-gray-400 hover:text-blue-600 hover:border-blue-600" }`} >
+                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /> </svg> Compartilhar
+                         </button>
+                         {news.sourceLink && (
+                             <a href={news.sourceLink} target="_blank" rel="noopener noreferrer" className={`flex items-center justify-center text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ml-auto ${ isDarkMode ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600" }`} >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /> </svg> Visitar Fonte
+                             </a>
+                         )}
+                     </div>
+
+                     {/* Ad Placeholder and Related News Section */}
+                     <div className={`mt-8 pt-6 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}>
+                        {/* AdMob Native Ad Placeholder (conditionally rendered based on settings) */}
+                        {adSettings?.modal?.enabled && (
+                          <div className="mb-6">
+                            <AdMobBannerPlaceholder
+                              position="modal"
+                              adType="Native" // Or "Banner"
+                              adUnitId={adSettings.modal.id || ADMOB_TEST_IDS.NATIVE_ADVANCED} // Use ID from settings or test ID
+                              isDarkMode={isDarkMode}
+                            />
+                          </div>
+                        )}
+                        {/* Related News */}
+                        {relatedNews.length > 0 && (
+                            <div>
+                                <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? "text-white" : "text-gray-800"}`}>Mais Notícias</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {relatedNews.map((relatedItem) => (
+                                    <div key={relatedItem.id} className={`flex items-center p-3 rounded-lg shadow-md transition-all duration-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer ${ isDarkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200" }`} onClick={() => onOpenModal(relatedItem)} >
+                                        <img src={relatedItem.image || PLACEHOLDER_IMAGE} alt={relatedItem.title || 'Notícia Relacionada'} className="w-16 h-16 object-cover rounded-lg mr-3 flex-shrink-0" loading="lazy" onError={(e) => e.target.src = PLACEHOLDER_IMAGE} />
+                                        <div className="flex-grow min-w-0">
+                                            <p className={`text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"} line-clamp-2`}>{relatedItem.title || "Sem Título"}</p>
+                                            <p className={`text-xs mt-1 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{relatedItem.source || 'Fonte'} • {relatedItem.category || 'Categoria'}</p>
+                                        </div>
+                                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ml-2 flex-shrink-0 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /> </svg>
+                                    </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                     </div>
+                </div>
+            </div>
+        </div>
+        );
+    };
+
+    // --- Settings Modal Component ---
+    const SettingsModal = ({ isOpen, onClose, isDarkMode, appSettings, updateSettings }) => {
+        const [activeTab, setActiveTab] = React.useState('rss'); // 'rss', 'feed', 'ads', 'backup', 'supabase'
+
+        // Local state for editing settings without modifying the global state directly
+        const [localRssFeeds, setLocalRssFeeds] = React.useState({});
+        const [localAdSettings, setLocalAdSettings] = React.useState({});
+        const [localFeedSettings, setLocalFeedSettings] = React.useState({});
+        const [localSupabaseConfig, setLocalSupabaseConfig] = React.useState({});
+        const [newFeedName, setNewFeedName] = React.useState('');
+        const [newFeedUrl, setNewFeedUrl] = React.useState('');
+
+        // Update local state when the modal opens or appSettings prop changes
+        React.useEffect(() => {
+            if (isOpen) {
+                // Deep copy to prevent accidental mutation of the original appSettings object
+                setLocalRssFeeds(JSON.parse(JSON.stringify(appSettings.rssFeeds || {})));
+                setLocalAdSettings(JSON.parse(JSON.stringify(appSettings.adSettings || {})));
+                setLocalFeedSettings(JSON.parse(JSON.stringify(appSettings.feedSettings || {})));
+                setLocalSupabaseConfig(JSON.parse(JSON.stringify(appSettings.supabaseConfig || {})));
+                setNewFeedName(''); // Reset add form
+                setNewFeedUrl('');
+            }
+        }, [isOpen, appSettings]); // Rerun effect if isOpen or appSettings changes
+
+        const handleSaveSettings = () => {
+            console.log("Saving updated settings...");
+            // Perform validation if needed before saving
+            updateSettings({
+                // Pass the edited local state back to the App component
+                rssFeeds: localRssFeeds,
+                adSettings: localAdSettings,
+                feedSettings: localFeedSettings,
+                supabaseConfig: localSupabaseConfig,
+            });
+            onClose(); // Close the modal after saving
+        };
+
+        // --- RSS Tab Functions ---
+        const handleAddFeed = (e) => {
+            e.preventDefault();
+            const trimmedName = newFeedName.trim();
+            const trimmedUrl = newFeedUrl.trim();
+            if (!trimmedName || !trimmedUrl) {
+                alert("Por favor, preencha o nome e a URL do feed."); return;
+            }
+            if (localRssFeeds[trimmedName]) {
+                 alert(`Um feed com o nome "${trimmedName}" já existe.`); return;
+            }
+            try {
+                new URL(trimmedUrl); // Basic URL validation
+                setLocalRssFeeds(prev => ({
+                    ...prev,
+                    [trimmedName]: { url: trimmedUrl, enabled: true } // Add new feed as enabled
+                }));
+                setNewFeedName(''); // Clear form
+                setNewFeedUrl('');
+            } catch (_) {
+                alert("A URL do feed parece ser inválida.");
+            }
+        };
+
+        const handleToggleFeed = (name) => {
+            setLocalRssFeeds(prev => ({
+                ...prev,
+                [name]: { ...prev[name], enabled: !prev[name].enabled } // Toggle enabled status
+            }));
+        };
+
+        const handleDeleteFeed = (name) => {
+             if (confirm(`Tem certeza que deseja excluir o feed "${name}"? Esta ação não pode ser desfeita.`)) {
+                setLocalRssFeeds(prev => {
+                    const newState = { ...prev };
+                    delete newState[name]; // Remove the feed by key
+                    return newState;
+                });
+             }
+         };
+
+         const handleEditFeedUrl = (name, newUrl) => {
+             setLocalRssFeeds(prev => ({
+                 ...prev,
+                 [name]: { ...prev[name], url: newUrl } // Update only the URL
+             }));
+         };
+
+        // --- Ads Tab Functions ---
+        const handleAdIdChange = (placement, newId) => {
+            setLocalAdSettings(prev => ({
+                ...prev,
+                [placement]: { ...prev[placement], id: newId }
+            }));
+        };
+
+        const handleToggleAdPlacement = (placement) => {
+            setLocalAdSettings(prev => ({
+                ...prev,
+                // Ensure the placement object exists before toggling
+                [placement]: { ...(prev[placement] || { id: '', enabled: false }), enabled: !prev[placement]?.enabled }
+            }));
+        };
+
+        // --- Backup Tab Functions ---
+        const handleExportJSON = () => { // Renamed from handleExportCSV
+            console.log("Exporting settings as JSON...");
+            try {
+                const settingsToExport = {
+                    rssFeeds: localRssFeeds,
+                    adSettings: localAdSettings,
+                    feedSettings: localFeedSettings,
+                    supabaseConfig: localSupabaseConfig,
+                    // Add other settings if needed in the future
+                };
+                const jsonString = JSON.stringify(settingsToExport, null, 2); // Pretty print JSON
+                const blob = new Blob([jsonString], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `newsflow_settings_${new Date().toISOString().split('T')[0]}.json`; // Filename with date
+                document.body.appendChild(link);
+                link.click(); // Trigger download
+                document.body.removeChild(link); // Clean up
+                URL.revokeObjectURL(url); // Release memory
+                alert("Configurações exportadas como 'newsflow_settings_....json' com sucesso!");
+            } catch (error) {
+                console.error("Error exporting settings:", error);
+                alert("Ocorreu um erro ao exportar as configurações.");
+            }
+        };
+
+        const handleImportJSON = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (file.type !== "application/json") {
+                alert("Por favor, selecione um arquivo .json válido.");
+                event.target.value = null; // Clear input
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedSettings = JSON.parse(e.target.result);
+                    console.log("Importing settings:", importedSettings);
+
+                    // Basic validation: Check if essential keys exist
+                    if (typeof importedSettings.rssFeeds === 'object' && typeof importedSettings.adSettings === 'object') {
+                         // Update local states with imported data (provide defaults if missing)
+                         // Use deep merge or careful assignment if structure might vary significantly
+                         setLocalRssFeeds(importedSettings.rssFeeds || {});
+                         setLocalAdSettings(importedSettings.adSettings || appSettings.adSettings); // Fallback to default structure if needed
+                         setLocalFeedSettings(importedSettings.feedSettings || appSettings.feedSettings);
+                         setLocalSupabaseConfig(importedSettings.supabaseConfig || appSettings.supabaseConfig);
+                         alert("Configurações importadas com sucesso! Revise as abas e clique em 'Salvar Alterações' para aplicá-las permanentemente.");
+                    } else {
+                        alert("Arquivo JSON inválido ou faltando dados essenciais (rssFeeds, adSettings).");
+                    }
+                } catch (error) {
+                    console.error("Error importing JSON:", error);
+                    alert("Erro ao ler ou processar o arquivo JSON.");
+                } finally {
+                    event.target.value = null; // Clear the input field regardless of outcome
+                }
+            };
+            reader.onerror = () => {
+                 console.error("File reading error");
+                 alert("Erro ao ler o arquivo selecionado.");
+                 event.target.value = null;
+            };
+            reader.readAsText(file);
+        };
+
+        // --- Feed Layout Tab Functions (Placeholder) ---
+         const handleToggleFeedSetting = (key) => {
+             setLocalFeedSettings(prev => ({
+                 ...prev,
+                 [key]: !prev[key] // Simple boolean toggle
+             }));
+         };
+
+        // --- Supabase Tab Functions (Placeholder) ---
+         const handleSupabaseChange = (key, value) => {
+             setLocalSupabaseConfig(prev => ({
+                 ...prev,
+                 [key]: value
+             }));
+         };
+
+
+        if (!isOpen) return null; // Don't render the modal if it's not open
+
+        // Reusable CSS classes for inputs, buttons, etc.
+        const inputClass = `w-full p-2 border rounded text-sm ${isDarkMode ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400 focus:ring-blue-500 focus:border-blue-500' : 'bg-white border-gray-300 text-gray-800 placeholder-gray-500 focus:ring-blue-500 focus:border-blue-500'}`;
+        const buttonClass = `px-4 py-2 rounded text-sm font-medium transition-colors duration-200 disabled:opacity-60 disabled:cursor-not-allowed`;
+        const primaryButtonClass = `${buttonClass} ${isDarkMode ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-blue-500 text-white hover:bg-blue-600'}`;
+        const secondaryButtonClass = `${buttonClass} ${isDarkMode ? 'bg-gray-600 text-gray-200 hover:bg-gray-500' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`;
+        const dangerButtonClass = `${buttonClass} ${isDarkMode ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-red-500 text-white hover:bg-red-600'}`;
+        const switchBaseClass = "relative inline-flex items-center h-6 rounded-full w-11 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2";
+        const switchKnobClass = "inline-block w-4 h-4 transform bg-white rounded-full transition-transform duration-200";
+
+        // Reusable Tab Button Component
+        const TabButton = ({ id, label }) => (
+            <button
+                onClick={() => setActiveTab(id)}
+                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors duration-200 whitespace-nowrap ${
+                    activeTab === id
+                    ? (isDarkMode ? 'text-blue-400 border-blue-400' : 'text-blue-600 border-blue-600') // Active tab style
+                    : (isDarkMode ? 'text-gray-400 border-transparent hover:text-gray-200 hover:border-gray-500' : 'text-gray-500 border-transparent hover:text-gray-800 hover:border-gray-300') // Inactive tab style
+                }`}
+                role="tab"
+                aria-selected={activeTab === id}
+                aria-controls={`tab-panel-${id}`}
+            >
+                {label}
+            </button>
+        );
+
+        // Reusable Toggle Switch Component
+        const ToggleSwitch = ({ enabled, onChange, labelId }) => {
+             return (
+                 <button
+                     type="button"
+                     onClick={onChange}
+                     className={`${switchBaseClass} ${enabled ? (isDarkMode ? 'bg-green-500 focus:ring-green-400' : 'bg-green-600 focus:ring-green-500') : (isDarkMode ? 'bg-gray-600 focus:ring-gray-500' : 'bg-gray-400 focus:ring-gray-400')} ${isDarkMode ? 'focus:ring-offset-gray-800' : 'focus:ring-offset-white'}`}
+                     role="switch"
+                     aria-checked={enabled}
+                     aria-labelledby={labelId} // Link switch to its label for accessibility
+                 >
+                     <span className="sr-only">{(labelId || "Toggle") + (enabled ? " Ativado" : " Desativado")}</span>
+                     <span className={`${switchKnobClass} ${enabled ? (isDarkMode ? 'translate-x-5' : 'translate-x-5') : 'translate-x-1'}`} /> {/* Adjusted translate for w-11 */}
+                 </button>
+             );
+         };
+
+
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-70 p-4" role="dialog" aria-modal="true" aria-labelledby="settings-modal-title">
+                <div className={`flex flex-col rounded-lg shadow-xl max-w-3xl w-full max-h-[90vh] overflow-hidden ${isDarkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}>
+                    {/* Modal Header */}
+                    <div className={`flex justify-between items-center p-4 border-b flex-shrink-0 ${isDarkMode ? 'border-gray-700' : 'border-gray-600'}`}>
+                        <h2 id="settings-modal-title" className="text-xl font-bold">Configurações</h2>
+                        <button onClick={onClose} title="Fechar Configurações" className={`p-1 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-400 hover:text-white hover:bg-gray-700" : "text-gray-600 hover:text-gray-800 hover:bg-gray-200"}`}>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
+
+                    {/* Tab Navigation */}
+                    <div className={`flex space-x-1 border-b px-4 overflow-x-auto flex-shrink-0 ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`} role="tablist">
+                        <TabButton id="rss" label="RSS Feeds" />
+                        <TabButton id="feed" label="Layout Feed" />
+                        <TabButton id="ads" label="Anúncios" />
+                        <TabButton id="backup" label="Backup" />
+                        <TabButton id="supabase" label="Supabase" />
+                    </div>
+
+                    {/* Tab Content Area */}
+                    <div className="p-5 overflow-y-auto flex-grow space-y-6">
+                        {/* RSS Feeds Tab */}
+                        {activeTab === 'rss' && (
+                             <div id="tab-panel-rss" role="tabpanel" className="space-y-4">
+                                <h3 className="text-lg font-semibold mb-3">Gerenciar Feeds RSS</h3>
+                                {/* Add New Feed Form */}
+                                <form onSubmit={handleAddFeed} className={`flex flex-col sm:flex-row gap-3 items-end p-3 border rounded-md ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                                    <div className="flex-grow w-full sm:w-auto">
+                                        <label htmlFor="newFeedName" className="block text-xs font-medium mb-1">Nome do Feed</label>
+                                        <input id="newFeedName" type="text" placeholder="Ex: Tecnologia G1" value={newFeedName} onChange={e => setNewFeedName(e.target.value)} className={inputClass} required />
+                                    </div>
+                                     <div className="flex-grow w-full sm:w-auto">
+                                         <label htmlFor="newFeedUrl" className="block text-xs font-medium mb-1">URL do Feed RSS</label>
+                                         <input id="newFeedUrl" type="url" placeholder="https://..." value={newFeedUrl} onChange={e => setNewFeedUrl(e.target.value)} className={inputClass} required />
+                                     </div>
+                                    <button type="submit" className={`${primaryButtonClass} h-9 self-end sm:self-auto w-full sm:w-auto mt-2 sm:mt-0 flex-shrink-0`}>Adicionar</button>
+                                </form>
+                                {/* List of Existing Feeds */}
+                                <div className="space-y-3 max-h-60 overflow-y-auto pr-2 border rounded-md p-3 ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}">
+                                    {Object.entries(localRssFeeds).length > 0 ? Object.entries(localRssFeeds).map(([name, feed]) => (
+                                        <div key={name} className={`flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 p-3 border rounded-md ${isDarkMode ? 'border-gray-600 bg-gray-750' : 'border-gray-200 bg-gray-50'}`}>
+                                            {/* Feed Name and URL Input */}
+                                            <div className="flex-grow space-y-1 min-w-0 mr-2">
+                                                <span id={`feed-label-${name}`} className={`font-medium text-sm break-words ${feed.enabled ? '' : 'line-through text-gray-500'}`}>{name}</span>
+                                                <label htmlFor={`feed-url-${name}`} className="sr-only">URL do Feed {name}</label>
+                                                <input
+                                                     id={`feed-url-${name}`}
+                                                     type="url"
+                                                     value={feed.url}
+                                                     onChange={(e) => handleEditFeedUrl(name, e.target.value)}
+                                                     className={`${inputClass} text-xs p-1 ${!feed.enabled ? 'opacity-50' : ''}`} // Keep input visible but less prominent if disabled
+                                                     disabled={!feed.enabled}
+                                                     aria-describedby={`feed-label-${name}`}
+                                                 />
+                                            </div>
+                                            {/* Controls: Toggle and Delete */}
+                                            <div className="flex items-center space-x-2 flex-shrink-0 self-end sm:self-center mt-2 sm:mt-0">
+                                                <ToggleSwitch enabled={feed.enabled} onChange={() => handleToggleFeed(name)} labelId={`feed-label-${name}`} />
+                                                <button onClick={() => handleDeleteFeed(name)} className={`${dangerButtonClass} px-2 py-1`} title={`Excluir Feed ${name}`}>
+                                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                     <span className="sr-only">Excluir Feed {name}</span>
+                                                 </button>
+                                             </div>
+                                        </div>
+                                    )) : <p className="text-center text-sm text-gray-500 py-4">Nenhum feed RSS adicionado ainda.</p>}
+                                </div>
+                             </div>
+                        )}
+
+                        {/* Feed Layout Tab */}
+                        {activeTab === 'feed' && (
+                            <div id="tab-panel-feed" role="tabpanel" className="space-y-4">
+                                <h3 className="text-lg font-semibold mb-3">Personalizar Layout do Feed</h3>
+                                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Controle quais elementos da interface principal são exibidos.</p>
+                                <div className="space-y-3">
+                                    {Object.entries(localFeedSettings).map(([key, value]) => (
+                                        <div key={key} className={`flex items-center justify-between p-3 border rounded-md ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                                            {/* Format key: showHeader -> Show Header */}
+                                            <span id={`feed-setting-${key}`} className="text-sm capitalize">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</span>
+                                            <ToggleSwitch enabled={!!value} onChange={() => handleToggleFeedSetting(key)} labelId={`feed-setting-${key}`} />
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                         {/* Ads Tab */}
+                         {activeTab === 'ads' && (
+                             <div id="tab-panel-ads" role="tabpanel" className="space-y-4">
+                                 <h3 className="text-lg font-semibold mb-3">Configurar IDs de Anúncios AdMob</h3>
+                                 <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Insira seus IDs de bloco de anúncios AdMob reais aqui. IDs de teste são usados por padrão. Ative/desative cada bloco conforme necessário.</p>
+                                 {Object.entries(localAdSettings).map(([placement, config]) => (
+                                     <div key={placement} className={`p-3 border rounded-md space-y-2 ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}>
+                                         {/* Toggle and Label */}
+                                         <div className="flex items-center justify-between">
+                                             {/* Format key: topBanner -> Top Banner */}
+                                             <label htmlFor={`ad-id-${placement}`} id={`ad-label-${placement}`} className="block text-sm font-medium capitalize">
+                                                 {placement.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                                             </label>
+                                             <ToggleSwitch enabled={!!config?.enabled} onChange={() => handleToggleAdPlacement(placement)} labelId={`ad-label-${placement}`} />
+                                         </div>
+                                         {/* Ad Unit ID Input */}
+                                         <input
+                                             id={`ad-id-${placement}`}
+                                             type="text"
+                                             placeholder={`ID do Bloco (ex: ca-app-pub-...)`}
+                                             value={config?.id || ''}
+                                             onChange={(e) => handleAdIdChange(placement, e.target.value)}
+                                             className={`${inputClass} ${!config?.enabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                             disabled={!config?.enabled}
+                                             aria-labelledby={`ad-label-${placement}`}
+                                         />
+                                         {!config?.enabled && <p className="text-xs text-gray-500 mt-1">Este bloco de anúncios está desativado.</p>}
+                                     </div>
+                                 ))}
+                             </div>
+                         )}
+
+                        {/* Backup Tab */}
+                        {activeTab === 'backup' && (
+                            <div id="tab-panel-backup" role="tabpanel" className="space-y-4">
+                                <h3 className="text-lg font-semibold mb-3">Backup e Restauração</h3>
+                                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Exporte suas configurações atuais (Feeds, Layout, Anúncios, Supabase) como um arquivo JSON ou importe um backup anterior.</p>
+                                <div className="flex flex-col sm:flex-row gap-3 mt-4">
+                                    {/* Export Button */}
+                                    <button onClick={handleExportJSON} className={`${secondaryButtonClass} w-full sm:w-auto`}>
+                                        Exportar Configurações (JSON)
+                                    </button>
+                                    {/* Import Button (styled label for hidden input) */}
+                                    <div>
+                                        <label htmlFor="import-json-input" className={`${primaryButtonClass} cursor-pointer w-full sm:w-auto block text-center`}>
+                                            Importar Configurações (JSON)
+                                        </label>
+                                         <input
+                                             id="import-json-input"
+                                             type="file"
+                                             accept=".json,application/json" // Specify accepted types
+                                             onChange={handleImportJSON}
+                                             className="hidden" // Hide the default file input appearance
+                                             aria-label="Selecionar arquivo JSON para importar"
+                                         />
+                                    </div>
+                                </div>
+                                 <p className={`text-xs mt-4 ${isDarkMode ? 'text-gray-500' : 'text-gray-600'}`}>Nota: A importação modificará as configurações exibidas neste modal. Clique em "Salvar Alterações" para aplicá-las permanentemente.</p>
+                            </div>
+                        )}
+
+                        {/* Supabase Tab */}
+                        {activeTab === 'supabase' && (
+                            <div id="tab-panel-supabase" role="tabpanel" className="space-y-4">
+                                <h3 className="text-lg font-semibold mb-3">Configuração Supabase (Opcional)</h3>
+                                <p className={`text-sm ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>Insira suas credenciais Supabase se desejar habilitar funcionalidades de backend (ex: sincronização de favoritos entre dispositivos - não implementado). Deixe em branco se não for usar.</p>
+                                <div className="space-y-3">
+                                    <div>
+                                        <label htmlFor="supabase-url" className="block text-sm font-medium mb-1">Supabase URL</label>
+                                        <input id="supabase-url" type="url" placeholder="https://seu-projeto.supabase.co" value={localSupabaseConfig.url || ''} onChange={e => handleSupabaseChange('url', e.target.value)} className={inputClass} />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="supabase-key" className="block text-sm font-medium mb-1">Supabase Anon Key (Chave Pública)</label>
+                                        <input id="supabase-key" type="text" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." value={localSupabaseConfig.anonKey || ''} onChange={e => handleSupabaseChange('anonKey', e.target.value)} className={inputClass} />
+                                    </div>
+                                    <div>
+                                         <label htmlFor="supabase-sql" className="block text-sm font-medium mb-1">SQL Adicional (Opcional)</label>
+                                         <textarea id="supabase-sql" rows="3" placeholder="-- Comandos SQL para setup inicial (ex: criar tabelas)" value={localSupabaseConfig.sql || ''} onChange={e => handleSupabaseChange('sql', e.target.value)} className={`${inputClass} font-mono text-xs leading-tight`}></textarea>
+                                         <p className={`text-xs mt-1 ${isDarkMode ? 'text-gray-500' : 'text-gray-600'}`}>Usado para configurar o banco de dados, se necessário.</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                     {/* Modal Footer with Actions */}
+                     <div className={`flex justify-end p-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-300'} mt-auto flex-shrink-0`}>
+                         <button onClick={onClose} className={`${secondaryButtonClass} mr-2`}>
+                             Cancelar
+                         </button>
+                         <button onClick={handleSaveSettings} className={primaryButtonClass}>
+                             Salvar Alterações
+                         </button>
+                     </div>
+                </div>
+            </div>
+        );
+    };
+
+
+    // --- Main Application Component ---
+    const App = () => {
+      // --- State Variables ---
+      const [selectedNews, setSelectedNews] = React.useState(null); // News item currently open in modal
+      const [isDarkMode, setIsDarkMode] = React.useState(() => {
+          // Check localStorage or system preference for initial dark mode
+          const savedTheme = localStorage.getItem('darkMode');
+          if (savedTheme !== null) return JSON.parse(savedTheme);
+          return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      });
+      const [activeCategory, setActiveCategory] = React.useState("Todas"); // Currently selected feed category
+      const [searchQuery, setSearchQuery] = React.useState(""); // Search term input
+      const [sortBy, setSortBy] = React.useState("newest"); // Sorting option
+      const [newsData, setNewsData] = React.useState([]); // News items for the *active* category
+      const [favoritedNews, setFavoritedNews] = React.useState(() => {
+          // Load favorites from localStorage
+          try { const saved = localStorage.getItem('favoritedNews'); return saved ? new Set(JSON.parse(saved)) : new Set(); }
+          catch (e) { console.error("Failed to load favorites:", e); return new Set(); }
+      });
+      const [allFetchedNews, setAllFetchedNews] = React.useState({}); // Cache for all fetched news items { category: [items] }
+      const [showFavoritesOnly, setShowFavoritesOnly] = React.useState(false); // Flag to display only favorites
+      const [displayedNewsCount, setDisplayedNewsCount] = React.useState(12); // Number of news items currently shown (for infinite scroll)
+      const [isLoading, setIsLoading] = React.useState(true); // Loading state indicator
+      const [error, setError] = React.useState(null); // Error message state
+      const [showScrollTop, setShowScrollTop] = React.useState(false); // Visibility of scroll-to-top button
+      const [showPremiumModal, setShowPremiumModal] = React.useState(false); // Visibility of premium modal
+      const [currentlySpeakingId, setCurrentlySpeakingId] = React.useState(null); // ID of the item currently being spoken
+      const observer = React.useRef(); // IntersectionObserver for infinite scroll
+
+      // --- Application Settings State (Loaded from localStorage) ---
+      const [appSettings, setAppSettings] = React.useState(() => {
+          const savedSettings = localStorage.getItem('appSettings');
+          // Define default settings structure
+          const defaultSettings = {
+              rssFeeds: Object.entries(initialRssFeeds).reduce((acc, [name, url]) => {
+                  // Default structure: { name: { url: '...', enabled: true } }
+                  acc[name] = { url: url, enabled: true };
+                  return acc;
+              }, {}),
+              adSettings: {
+                  // Default structure: { placement: { id: 'test-id', enabled: true } }
+                  topBanner: { id: ADMOB_TEST_IDS.BANNER, enabled: true },
+                  nativeFeed: { id: ADMOB_TEST_IDS.NATIVE_ADVANCED, enabled: true }, // Ad shown within the news grid
+                  modal: { id: ADMOB_TEST_IDS.NATIVE_ADVANCED, enabled: true }, // Ad shown inside the news detail modal
+                  rewardedPremium: { id: ADMOB_TEST_IDS.REWARDED, enabled: true }, // Ad for premium access
+                  footerBanner: { id: ADMOB_TEST_IDS.BANNER, enabled: true },
+                  // Add other potential placements here with defaults
+              },
+              feedSettings: { // Settings to control UI elements visibility
+                 showHeader: true,
+                 showCategories: true,
+                 showSearch: true,
+                 showFooter: true,
+              },
+              supabaseConfig: { // Supabase credentials (optional)
+                  url: '',
+                  anonKey: '',
+                  sql: '' // Optional setup SQL
+              }
+          };
+          try {
+              if (savedSettings) {
+                  const parsed = JSON.parse(savedSettings);
+                  // Deep merge parsed settings with defaults to ensure all keys exist
+                  // This is a basic merge, more robust merging might be needed for complex nested objects
+                  const mergedSettings = {
+                      ...defaultSettings,
+                      ...parsed,
+                      rssFeeds: { ...defaultSettings.rssFeeds, ...(parsed.rssFeeds || {}) },
+                      adSettings: { ...defaultSettings.adSettings, ...(parsed.adSettings || {}) },
+                      feedSettings: { ...defaultSettings.feedSettings, ...(parsed.feedSettings || {}) },
+                      supabaseConfig: { ...defaultSettings.supabaseConfig, ...(parsed.supabaseConfig || {}) },
+                  };
+                  return mergedSettings;
+              } else {
+                return defaultSettings; // No saved settings, use defaults
+              }
+          } catch (e) {
+              console.error("Error loading settings from localStorage:", e);
+              localStorage.removeItem('appSettings'); // Clear potentially corrupted data
+              return defaultSettings; // Fallback to defaults on error
+          }
+      });
+
+      const [showSettingsModal, setShowSettingsModal] = React.useState(false); // Visibility of the settings modal
+
+      // --- Effects ---
+
+      // Effect to Save Settings, Favorites, and Apply Theme
+      React.useEffect(() => {
+          // Apply Dark/Light mode theme class to body
+          const bodyClassList = document.body.classList;
+          if (isDarkMode) { bodyClassList.add("bg-gray-900", "text-white"); bodyClassList.remove("bg-gray-100", "text-gray-800"); }
+          else { bodyClassList.add("bg-gray-100", "text-gray-800"); bodyClassList.remove("bg-gray-900", "text-white"); }
+
+          // Save current theme preference and favorites to localStorage
+          localStorage.setItem('darkMode', JSON.stringify(isDarkMode));
+          localStorage.setItem('favoritedNews', JSON.stringify(Array.from(favoritedNews)));
+
+          // Save the entire appSettings object to localStorage
+          try {
+            localStorage.setItem('appSettings', JSON.stringify(appSettings));
+          } catch (e) {
+              console.error("Error saving settings to localStorage:", e);
+              // Handle potential storage quota exceeded errors if needed
+          }
+
+       }, [isDarkMode, favoritedNews, appSettings]); // Rerun when theme, favorites, or settings change
+
+       // Effect to Load Initial News Feed
+       React.useEffect(() => {
+           speechManager.loadVoices(); // Preload voices on app start
+           // Find the first *enabled* category from settings to load initially
+           const firstActiveCategory = Object.keys(appSettings.rssFeeds || {}).find(key => appSettings.rssFeeds[key]?.enabled) || Object.keys(initialRssFeeds)[0] || "Todas"; // Fallback needed if all are disabled
+           setActiveCategory(firstActiveCategory); // Set the active category state
+           fetchAndParseRss(firstActiveCategory); // Fetch data for this category
+       }, []); // Runs only once on initial mount
+
+       // Effect for Scroll-to-Top Button Visibility
+       React.useEffect(() => {
+           const handleScroll = () => setShowScrollTop(window.scrollY > 300);
+           window.addEventListener("scroll", handleScroll);
+           return () => window.removeEventListener("scroll", handleScroll); // Cleanup listener
+       }, []);
+
+
+      // --- Functions ---
+
+      // Function to update appSettings (passed to SettingsModal)
+      const updateSettings = (newSettings) => {
+          console.log("Applying updated settings:", newSettings);
+          setAppSettings(prev => ({ ...prev, ...newSettings })); // Update state
+
+          // Check if the currently active category was disabled or removed
+          const currentCategoryConfig = newSettings.rssFeeds ? newSettings.rssFeeds[activeCategory] : null;
+          if (!showFavoritesOnly && (!currentCategoryConfig || !currentCategoryConfig.enabled)) {
+               console.log(`Active category "${activeCategory}" no longer valid, switching.`);
+               // Find the first available enabled category to switch to
+               const fallbackCategory = Object.keys(newSettings.rssFeeds || {}).find(key => newSettings.rssFeeds[key]?.enabled) || "Todas";
+               fetchAndParseRss(fallbackCategory); // Fetch data for the new fallback category
+          }
+          // Optional: Trigger a refresh if certain settings changed that require it?
+          // For now, rely on manual refresh or category change.
+      };
+
+      // Fetch and Parse RSS Feed Data
+      const fetchAndParseRss = async (category) => {
+         console.log(`Attempting to fetch category: ${category}`);
+         speechManager.cancel(() => setCurrentlySpeakingId(null)); // Stop any ongoing speech
+         setIsLoading(true); setError(null); setNewsData([]); // Reset state for new category
+         setDisplayedNewsCount(12); // Reset infinite scroll count
+
+         // Handle Favorites category separately
+         if (category === "Favoritos") {
+             setActiveCategory("Favoritos"); setShowFavoritesOnly(true);
+             const favoriteItems = Object.values(allFetchedNews).flat() // Get all items from cache
+                 .filter(news => favoritedNews.has(news.id)) // Filter by favorite IDs
+                 .filter((news, index, self) => index === self.findIndex(n => n.id === news.id)); // Ensure uniqueness
+             setNewsData(favoriteItems); // Set favorites as current data
+             setDisplayedNewsCount(favoriteItems.length || 1); // Show all favorites
+             setIsLoading(false);
+             console.log(`Displayed ${favoriteItems.length} favorites.`);
+             return;
+         }
+
+         // Handle regular RSS categories
+         setShowFavoritesOnly(false);
+         setActiveCategory(category);
+
+         // --- Get feed URL and check if enabled from appSettings ---
+         const feedConfig = appSettings.rssFeeds ? appSettings.rssFeeds[category] : null;
+         if (!feedConfig || !feedConfig.enabled || !feedConfig.url) {
+             const errorMsg = `Feed para "${category}" não encontrado, desativado ou sem URL nas configurações.`;
+             console.error(errorMsg);
+             setError(errorMsg); setIsLoading(false);
+             return;
+         }
+         const feedUrl = feedConfig.url;
+         // --- End Settings Check ---
+
+         const urlToFetch = `${CORS_PROXY}${encodeURIComponent(feedUrl)}`;
+         console.log(`Fetching from: ${urlToFetch}`);
+
+         try {
+             const response = await fetch(urlToFetch, { cache: 'no-store' }); // Prevent browser caching issues
+             if (!response.ok) {
+                 let errorDetail = `Status: ${response.status}`;
+                 try { const errorText = await response.text(); errorDetail += ` - ${errorText.substring(0, 150)}...`; } catch {}
+                 throw new Error(`Erro HTTP ao buscar feed: ${errorDetail}. Verifique a URL do feed e o status do CORS Proxy (${CORS_PROXY}).`);
+             }
+             const xmlText = await response.text();
+             const parser = new DOMParser();
+             const xmlDoc = parser.parseFromString(xmlText, "application/xml");
+             const parserError = xmlDoc.querySelector("parsererror");
+             if (parserError) {
+                 // Check if the response looks like HTML instead of XML
+                 if (xmlText.trim().toLowerCase().startsWith('<html') || xmlText.trim().toLowerCase().startsWith('<!doctype html')) {
+                    throw new Error(`Erro ao processar XML para "${category}". A resposta parece ser HTML, não um feed RSS válido. Verifique a URL.`);
+                 } else {
+                    throw new Error(`Erro ao processar XML para "${category}": ${parserError.textContent.substring(0, 200)}`);
+                 }
+             }
+
+             const items = xmlDoc.querySelectorAll("item");
+             if (items.length === 0 && !xmlDoc.querySelector("channel title")) { // Check for basic channel structure
+                 console.warn(`Nenhum item <item> encontrado no feed "${category}". A estrutura do feed pode estar incorreta ou vazia.`);
+                 // Optional: Show a warning instead of a hard error if the feed structure is valid but empty?
+                 // setError(`Nenhum item encontrado no feed ${category}.`);
+             }
+             console.log(`Found ${items.length} items for "${category}"`);
+
+             const parsedNews = Array.from(items).map((item, index) => {
+                 const title = item.querySelector("title")?.textContent || "";
+                 const link = item.querySelector("link")?.textContent || "";
+                 // Robust GUID handling: use guid, link, or generate a fallback
+                 const guidElement = item.querySelector("guid");
+                 const guid = guidElement?.textContent || link || `rss-${category}-${Date.now()}-${index}-${Math.random()}`;
+                 const pubDate = item.querySelector("pubDate")?.textContent || "";
+                 const description = item.querySelector("description")?.textContent || "";
+                 let image = null;
+                 // Try common media tags first
+                 const mediaContent = item.querySelector("media\\:content, content"); // Handles namespaces
+                 if (mediaContent && mediaContent.getAttribute("url")) {
+                     image = mediaContent.getAttribute("url");
+                 } else {
+                     // Fallback: Try to extract from description HTML
+                     const imgMatch = description.match(/<img[^>]+src="([^"]+)"/i);
+                     if (imgMatch && imgMatch[1]) {
+                         image = imgMatch[1];
+                     }
+                     // Add more fallbacks if needed (e.g., enclosure tag)
+                 }
+
+                 return {
+                     id: guid,
+                     source: "G1", // Or extract from feed if available <channel><title>
+                     title: title,
+                     image: image, // Can be null
+                     date: formatDate(pubDate), // Formatted date
+                     pubDateRaw: pubDate, // Keep raw date for sorting
+                     summary: stripHtml(description).substring(0, 150) + (stripHtml(description).length > 150 ? '...' : ''),
+                     content: description, // Keep original HTML for modal
+                     sourceLink: link,
+                     category: category,
+                 };
+             });
+
+             setNewsData(parsedNews);
+             // Update the cache with the newly fetched items
+             setAllFetchedNews(prevCache => ({ ...prevCache, [category]: parsedNews }));
+
+         } catch (err) {
+             console.error(`Falha ao buscar/processar o feed "${category}":`, err);
+             setError(`Falha ao carregar "${category}". ${err.message}`);
+             setNewsData([]); // Clear data on error
+         } finally {
+             setIsLoading(false); // Ensure loading state is turned off
+         }
+      };
+
+      // Navigate Home (usually to "Todas" category)
+      const handleGoHome = () => {
+          console.log("Navigating Home...");
+          speechManager.cancel(() => setCurrentlySpeakingId(null));
+          setSelectedNews(null); // Close modal if open
+          setSearchQuery(""); // Clear search
+          setSortBy("newest"); // Reset sort
+          setDisplayedNewsCount(12); // Reset scroll count
+          setShowFavoritesOnly(false); // Ensure not showing favorites
+
+          // Determine the home category (usually "Todas", but check settings)
+          const homeCategory = "Todas";
+          const homeFeedConfig = appSettings.rssFeeds ? appSettings.rssFeeds[homeCategory] : null;
+
+          if (homeFeedConfig?.enabled) {
+               // If already on "Todas", refresh it. Otherwise, fetch it.
+              if (activeCategory === homeCategory) { handleRefresh(); } else { fetchAndParseRss(homeCategory); }
+          } else {
+              // If "Todas" is disabled/missing, find the *first* enabled feed as fallback home
+              console.warn(`"${homeCategory}" feed not enabled/found. Finding fallback.`);
+              const firstEnabledCategory = Object.keys(appSettings.rssFeeds || {}).find(key => appSettings.rssFeeds[key]?.enabled);
+              if (firstEnabledCategory) {
+                   fetchAndParseRss(firstEnabledCategory);
+              } else {
+                   // No feeds enabled at all!
+                   setError("Nenhum feed RSS está ativo nas configurações. Ative pelo menos um feed.");
+                   setIsLoading(false); setNewsData([]); setActiveCategory(''); // Clear active category
+              }
+          }
+      };
+
+      // Toggle Dark Mode
+      const toggleDarkMode = () => setIsDarkMode(prev => !prev);
+
+      // Toggle Favorite Status for a News Item
+      const toggleFavorite = (newsId) => {
+          setFavoritedNews(prev => {
+              const newSet = new Set(prev);
+              if (newSet.has(newsId)) { newSet.delete(newsId); } else { newSet.add(newsId); }
+              // Note: The useEffect hook handles saving this to localStorage
+              return newSet;
+          });
+         // If viewing favorites and an item is removed, refresh the favorites list immediately
+         if (showFavoritesOnly && favoritedNews.has(newsId)) {
+            // Slight delay to allow state update? Or filter directly? Filter directly might be better.
+             setNewsData(currentData => currentData.filter(item => item.id !== newsId));
+         }
+      };
+
+      // Refresh Current View (Category or Favorites)
+      const handleRefresh = () => {
+         if (showFavoritesOnly) {
+              console.log("Refreshing Favorites list...");
+              fetchAndParseRss("Favoritos"); // Refetches/filters favorites
+         } else if (activeCategory) {
+              // Check if the active category is still valid in settings before refreshing
+              const feedConfig = appSettings.rssFeeds ? appSettings.rssFeeds[activeCategory] : null;
+              if (feedConfig?.enabled) {
+                console.log(`Refreshing category: ${activeCategory}`);
+                setSearchQuery(""); // Optionally clear search on refresh
+                setSortBy("newest"); // Optionally reset sort
+                fetchAndParseRss(activeCategory); // Fetch fresh data
+              } else {
+                  console.warn(`Cannot refresh "${activeCategory}", feed not enabled or found.`);
+                  setError(`Não é possível atualizar "${activeCategory}", pois o feed não está ativo ou configurado.`);
+                  // Optional: Navigate home or show error more prominently
+                  handleGoHome(); // Navigate to a valid feed as a fallback
+              }
+         } else {
+             console.warn("Refresh called with no active category.");
+         }
+      };
+
+      // Load More News Items for Infinite Scroll
+      const loadMoreNews = () => {
+         // Prevent loading more if already loading, or if showing favorites (all are shown)
+         if (isLoading || showFavoritesOnly || displayedNewsCount >= filteredNews.length) return;
+         console.log("Loading more news...");
+         setIsLoading(true); // Show loading indicator briefly
+         // Simulate network delay for loading more
+         setTimeout(() => {
+            const moreNewsToAdd = 12; // How many more items to load
+            setDisplayedNewsCount(prev => Math.min(prev + moreNewsToAdd, filteredNews.length));
+            setIsLoading(false);
+         }, 300);
+      };
+
+      // --- Memoized Filtering and Sorting ---
+      const filteredNews = React.useMemo(() => {
+          // Start with either the current category's data or the filtered list of favorites
+          let dataToFilter = showFavoritesOnly
+             ? Object.values(allFetchedNews).flat().filter(news => favoritedNews.has(news.id)).filter((news, index, self) => index === self.findIndex(n => n.id === news.id)) // Get unique favorites
+             : newsData; // Use data for the active category
+
+          // Apply search query filter
+          const lowerCaseQuery = searchQuery.toLowerCase();
+          const searchedData = !searchQuery
+            ? dataToFilter // No search query, use all data
+            : dataToFilter.filter(news =>
+                (news.title && news.title.toLowerCase().includes(lowerCaseQuery)) ||
+                (news.summary && news.summary.toLowerCase().includes(lowerCaseQuery)) ||
+                (news.category && news.category.toLowerCase().includes(lowerCaseQuery)) // Also search category
+            );
+
+          // Apply sorting
+          return [...searchedData].sort((a, b) => {
+              const parseDate = (dateStr) => { try { return new Date(dateStr || 0); } catch { return new Date(0); } }; // Robust date parsing
+              if (sortBy === "newest") return parseDate(b.pubDateRaw || b.date) - parseDate(a.pubDateRaw || a.date);
+              if (sortBy === "oldest") return parseDate(a.pubDateRaw || a.date) - parseDate(b.pubDateRaw || b.date);
+              // LocaleCompare for proper string sorting (accents, etc.)
+              if (sortBy === "title-asc") return (a.title || '').localeCompare(b.title || '');
+              if (sortBy === "title-desc") return (b.title || '').localeCompare(a.title || '');
+              return 0; // Default: no sort change
+          });
+      }, [showFavoritesOnly ? favoritedNews : newsData, allFetchedNews, searchQuery, sortBy, activeCategory]); // Recompute when these change
+
+      // Slice the filtered/sorted news for display based on `displayedNewsCount`
+      const newsToDisplay = filteredNews.slice(0, displayedNewsCount);
+
+      // --- Infinite Scroll Setup ---
+      const lastNewsElementRef = React.useCallback(node => {
+          if (isLoading || showFavoritesOnly) return; // Don't observe if loading or showing favorites
+          if (observer.current) observer.current.disconnect(); // Disconnect previous observer
+          observer.current = new IntersectionObserver(entries => {
+              // If the last element is intersecting and there are more news items to load
+              if (entries[0].isIntersecting && displayedNewsCount < filteredNews.length) {
+                  loadMoreNews(); // Trigger loading more
+              }
+          }, { threshold: 0.5 }); // Trigger when 50% visible
+          if (node) observer.current.observe(node); // Observe the new last element
+      }, [isLoading, showFavoritesOnly, displayedNewsCount, filteredNews.length, loadMoreNews]); // Dependencies for the callback
+
+
+      // --- Prepare Items for Rendering (News Cards + Ad Cards) ---
+      const itemsToRender = [];
+      let newsCounter = 0;
+      const adPlacementConfig = appSettings.adSettings?.nativeFeed; // Get config for native ads in feed
+      const isFeedAdEnabled = adPlacementConfig?.enabled ?? false; // Check if enabled (default false if undefined)
+      const adUnitIdFeed = adPlacementConfig?.id || ADMOB_TEST_IDS.NATIVE_ADVANCED; // Get ID or use test ID
+
+      newsToDisplay.forEach((news, index) => {
+          const isLastNewsItem = index === newsToDisplay.length - 1; // Is this the last item currently displayed?
+          // Add News Card
+          itemsToRender.push(
+              <NewsCard
+                  key={news.id} // Use unique news ID as key
+                  ref={isLastNewsItem ? lastNewsElementRef : null} // Attach ref only to the last item
+                  news={news}
+                  onOpenModal={setSelectedNews}
+                  isDarkMode={isDarkMode}
+                  toggleFavorite={toggleFavorite}
+                  isFavorited={favoritedNews.has(news.id)}
+                  currentlySpeakingId={currentlySpeakingId}
+                  setCurrentlySpeakingId={setCurrentlySpeakingId}
+              />
+          );
+          newsCounter++;
+
+          // Add Native Ad Card periodically if enabled
+          const AD_FREQUENCY = 7; // Show ad after every 7 news items
+          if (isFeedAdEnabled && newsCounter % AD_FREQUENCY === 0 && !isLastNewsItem) { // Don't add ad after the very last item
+              itemsToRender.push(
+                  <AdMobNativeAdvancedCard
+                      key={`ad-${news.id}`} // Use related news ID for a somewhat stable key
+                      adUnitId={adUnitIdFeed}
+                      isDarkMode={isDarkMode}
+                  />
+              );
+          }
+      });
+
+      // Filter active RSS feeds to pass to the Navigation component
+      const activeRssFeedsForNav = Object.entries(appSettings.rssFeeds || {})
+                                    .filter(([_, feed]) => feed.enabled) // Only include enabled feeds
+                                    .reduce((acc, [name, feed]) => {
+                                        acc[name] = feed.url; // Navigation primarily needs the name (key)
+                                        return acc;
+                                    }, {});
+
+
+      // --- Render Application UI ---
+      return (
+        <div className={`flex flex-col min-h-screen transition-colors duration-300 ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"}`}>
+
+           {/* Header (Conditionally Rendered based on Settings) */}
+           {appSettings.feedSettings.showHeader && (
+             <header className={`p-4 sticky top-0 z-20 shadow-lg ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}>
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4">
+                        {/* Logo */}
+                        <div className="flex items-center flex-shrink-0 cursor-pointer" onClick={handleGoHome} title="NewsFlow - Ir para Início">
+                            <h1 className={`font-bold text-xl sm:text-2xl tracking-tight ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>NewsFlow</h1>
+                            {/* Optional: Add an icon/logo here */}
+                        </div>
+                        {/* Action Buttons */}
+                         <div className="flex items-center space-x-1 sm:space-x-2">
+                             {/* Home Button */}
+                             <button onClick={handleGoHome} title="Início (Feed Principal)" className={`p-2 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-blue-400" : "text-gray-700 hover:bg-gray-300 hover:text-blue-600"}`}>
+                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
+                             </button>
+                             {/* News Count Badge */}
+                            <span title={`${isLoading && !showFavoritesOnly ? "Carregando" : newsToDisplay.length + " notícias exibidas"}`} className={`news-count-badge flex items-center justify-center text-xs font-semibold px-2.5 py-1 rounded-full ${isDarkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-300 text-gray-700'}`}>
+                                {isLoading && !showFavoritesOnly ? ( <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75"></path></svg> ) : ( newsToDisplay.length )}
+                            </span>
+                            {/* Dark Mode Toggle */}
+                            <button onClick={toggleDarkMode} title={isDarkMode ? "Ativar Modo Claro" : "Ativar Modo Escuro"} className={`p-2 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-yellow-400" : "text-gray-700 hover:bg-gray-300 hover:text-blue-600"}`}>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">{isDarkMode ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /> : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />}</svg>
+                            </button>
+                            {/* Premium Button */}
+                            <button onClick={() => setShowPremiumModal(true)} title="Opções Premium" className={`p-2 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-green-400" : "text-gray-700 hover:bg-gray-300 hover:text-green-600"}`}>
+                                {/* Using a Star icon for Premium */}
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.196-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" /></svg>
+                            </button>
+                            {/* Favorites Toggle Button */}
+                            <button onClick={() => fetchAndParseRss(showFavoritesOnly ? (Object.keys(activeRssFeedsForNav)[0] || 'Todas') : "Favoritos")} title={showFavoritesOnly ? "Ver Todos os Feeds" : "Ver Favoritos"} className={`p-2 rounded-full transition-colors duration-200 ${showFavoritesOnly ? (isDarkMode ? "text-red-500 bg-red-900 bg-opacity-30" : "text-red-600 bg-red-100") : (isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-red-400" : "text-gray-700 hover:bg-gray-300 hover:text-red-600")}`}>
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={showFavoritesOnly ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={showFavoritesOnly ? 1 : 2}> <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /> </svg>
+                            </button>
+                            {/* Settings Button */}
+                            <button onClick={() => setShowSettingsModal(true)} title="Abrir Configurações" className={`p-2 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-blue-400" : "text-gray-700 hover:bg-gray-300 hover:text-blue-600"}`} >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"> <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /> <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /> </svg>
+                            </button>
+                         </div>
+                    </div>
+                </div>
+             </header>
+           )} {/* End Conditional Header */}
+
+           {/* Navigation, Top Ad, Search/Filters Area */}
+           <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+              {/* Category Navigation (Conditionally Rendered) */}
+              {appSettings.feedSettings.showCategories && Object.keys(activeRssFeedsForNav).length > 0 && (
+                 <Navigation
+                    onCategoryChange={fetchAndParseRss}
+                    activeCategory={activeCategory}
+                    isDarkMode={isDarkMode}
+                    rssFeeds={activeRssFeedsForNav} // Pass only active feeds
+                 />
+               )}
+               {/* Top Banner Ad Placeholder (Conditionally Rendered) */}
+              {appSettings.adSettings?.topBanner?.enabled && (
+                 <AdMobBannerPlaceholder
+                    position="top"
+                    adUnitId={appSettings.adSettings.topBanner.id || ADMOB_TEST_IDS.BANNER}
+                    isDarkMode={isDarkMode}
+                 />
+               )}
+               {/* Search and Filters (Conditionally Rendered) */}
+               {appSettings.feedSettings.showSearch && (
+                 <SearchAndFilters
+                    searchQuery={searchQuery} setSearchQuery={setSearchQuery}
+                    sortBy={sortBy} setSortBy={setSortBy}
+                    handleRefresh={handleRefresh}
+                    isDarkMode={isDarkMode}
+                    isLoading={isLoading && !showFavoritesOnly} // Show loading on refresh button only for category loads
+                 />
+               )}
+           </div>
+
+           {/* Main Content Area (News Grid) */}
+           <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 flex-grow">
+               {/* Error Message Display */}
+               {error && (
+                    <div className={`p-4 mb-6 rounded-lg text-center shadow ${isDarkMode ? 'bg-red-800 text-red-100 border border-red-700' : 'bg-red-100 text-red-800 border border-red-200'}`} role="alert">
+                       <p className="font-bold text-lg mb-2">Ops! Algo deu errado.</p>
+                       <p className="text-sm">{error}</p>
+                       <button onClick={handleRefresh} className={`mt-3 px-4 py-1.5 rounded text-sm font-medium transition-colors ${isDarkMode ? 'bg-red-600 hover:bg-red-500' : 'bg-red-200 hover:bg-red-300 text-red-800'}`}>Tentar Novamente</button>
+                   </div>
+                )}
+
+               {/* Loading State (Initial Load) */}
+               {isLoading && itemsToRender.length === 0 && !showFavoritesOnly && !error && (
+                    <div className="text-center py-10">
+                       <p className={`text-xl font-semibold mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Carregando {activeCategory}...</p>
+                       <svg className={`animate-spin mx-auto h-10 w-10 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"> <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" className="opacity-25"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" className="opacity-75"></path> </svg>
+                    </div>
+               )}
+
+               {/* News Grid (or No Results Message) */}
+               {!isLoading && itemsToRender.length > 0 ? (
+                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                       {itemsToRender} {/* Render news cards and ad cards */}
+                   </div>
+               ) : !isLoading && !error && filteredNews.length === 0 && (
+                   // Show different messages for no results vs. no favorites
+                   showFavoritesOnly ? (
+                     <div className="text-center py-10 mt-6">
+                        <p className={`text-lg font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Você ainda não tem favoritos.</p>
+                        <p className={`text-sm mt-1 ${isDarkMode ? "text-gray-500" : "text-gray-600"}`}>Clique no ícone ❤️ em uma notícia para adicioná-la aqui.</p>
+                     </div>
+                   ) : (
+                     <p className={`text-center py-10 text-lg ${isDarkMode ? "text-gray-500" : "text-gray-600"}`}>
+                         Nenhuma notícia encontrada para "{activeCategory}"
+                         {searchQuery ? ` com o termo "${searchQuery}"` : ''}.
+                         <br/> Verifique os filtros ou tente outra categoria.
+                     </p>
+                   )
+               )}
+
+               {/* Loading More Indicator (for infinite scroll) */}
+               {isLoading && itemsToRender.length > 0 && !showFavoritesOnly && (
+                   <div className="text-center py-6 mt-6">
+                       <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Carregando mais notícias...</p>
+                       {/* Optional: Add a smaller spinner here */}
+                   </div>
+               )}
+
+               {/* End of News Indicator */}
+               {!isLoading && !showFavoritesOnly && displayedNewsCount >= filteredNews.length && filteredNews.length > 0 && (
+                   <div className="text-center py-10 mt-6">
+                       <p className={`text-lg font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Fim das notícias para "{activeCategory}".</p>
+                   </div>
+               )}
+               {/* End of Favorites Message */}
+               {showFavoritesOnly && filteredNews.length > 0 && !isLoading && (
+                  <div className="text-center py-10 mt-6">
+                      <p className={`text-lg font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Exibindo {filteredNews.length} favorito(s).</p>
+                  </div>
+               )}
+
+           </main>
+
+           {/* Footer Ad Placeholder (Conditionally Rendered) */}
+           {appSettings.adSettings?.footerBanner?.enabled && (
+             <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6">
+                <AdMobBannerPlaceholder
+                   position="footer"
+                   adUnitId={appSettings.adSettings.footerBanner.id || ADMOB_TEST_IDS.BANNER}
+                   isDarkMode={isDarkMode}
+                />
+             </div>
+            )}
+
+            {/* Footer (Conditionally Rendered) */}
+            {appSettings.feedSettings.showFooter && (
+             <footer className={`w-full py-6 mt-auto flex-shrink-0 ${isDarkMode ? 'bg-gray-800 border-t border-gray-700' : 'bg-gray-200 border-t border-gray-300'}`}>
+                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+                     <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>
+                         © {new Date().getFullYear()} NewsFlow by João Ricardo
+                         <a href="https://www.instagram.com/joaoricardo.pe" target="_blank" rel="noopener noreferrer" className={`font-medium hover:underline ml-2 ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>
+                             @joaoricardo.pe
+                         </a>
+                     </p>
+                 </div>
+             </footer>
+            )}
+
+           {/* Scroll-to-Top Button */}
+           {showScrollTop && (
+                <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} title="Voltar ao topo" className={`fixed bottom-6 right-6 p-3 rounded-full shadow-lg transition-opacity duration-300 z-30 ${isDarkMode ? "bg-blue-600 text-white hover:bg-blue-500" : "bg-blue-500 text-white hover:bg-blue-600"}`} aria-label="Voltar ao topo">
+                   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" /></svg>
+                </button>
+            )}
+
+           {/* Modals Layer */}
+           {/* News Detail Modal */}
+           <NewsModal
+                news={selectedNews}
+                allNewsData={filteredNews} // Pass currently filtered/sorted data for "related"
+                onClose={() => setSelectedNews(null)} // Simple close handler
+                isDarkMode={isDarkMode}
+                toggleFavorite={toggleFavorite}
+                isFavorited={selectedNews ? favoritedNews.has(selectedNews.id) : false}
+                onOpenModal={setSelectedNews} // Allows opening related news from modal
+                currentlySpeakingId={currentlySpeakingId}
+                setCurrentlySpeakingId={setCurrentlySpeakingId}
+                adSettings={appSettings.adSettings} // Pass ad settings for potential modal ad
+            />
+           {/* Premium Options Modal */}
+           {showPremiumModal && (
+              <PremiumAdModal
+                 onClose={() => setShowPremiumModal(false)}
+                 isDarkMode={isDarkMode}
+                 adUnitId={appSettings.adSettings?.rewardedPremium?.id || ADMOB_TEST_IDS.REWARDED} // Use ID from settings
+              />
+           )}
+           {/* Settings Modal */}
+           <SettingsModal
+                 isOpen={showSettingsModal}
+                 onClose={() => setShowSettingsModal(false)}
+                 isDarkMode={isDarkMode}
+                 appSettings={appSettings} // Pass current settings
+                 updateSettings={updateSettings} // Pass update function
+            />
+        </div>
+      );
+    };
+
+    // --- Initialize and Render React App ---
+    const rootElement = document.getElementById("root");
+    if (rootElement) {
+        const root = ReactDOM.createRoot(rootElement);
+        root.render(
+            <React.StrictMode> {/* Optional: StrictMode helps catch potential problems */}
+                <App />
+            </React.StrictMode>
+        );
+    } else {
+        console.error("Root element with ID 'root' not found in the DOM.");
+    }
+
   </script>
 </body>
 </html>
+```
