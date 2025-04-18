@@ -1,1879 +1,348 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="scroll-smooth">
+<html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NewsFlow - Seu Leitor de Notícias Inteligente</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        primary: {
-                            50: '#f0f9ff',
-                            100: '#e0f2fe',
-                            200: '#bae6fd',
-                            300: '#7dd3fc',
-                            400: '#38bdf8',
-                            500: '#0ea5e9',
-                            600: '#0284c7',
-                            700: '#0369a1',
-                            800: '#075985',
-                            900: '#0c4a6e',
-                        }
-                    }
-                }
-            }
-        }
-    </script>
-    <style>
-        .fade-in {
-            animation: fadeIn 0.3s ease-in-out;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .card-hover:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-        }
-        
-        .modal-overlay {
-            background-color: rgba(0, 0, 0, 0.5);
-            backdrop-filter: blur(4px);
-        }
-        
-        .skeleton {
-            background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
-        }
-        
-        .dark .skeleton {
-            background: linear-gradient(90deg, #2d3748 25%, #4a5568 50%, #2d3748 75%);
-            background-size: 200% 100%;
-        }
-        
-        @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
-        
-        .scrollbar-hide::-webkit-scrollbar {
-            display: none;
-        }
-        
-        .scrollbar-hide {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-        
-        /* Custom scrollbar for settings panel */
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-        }
-        
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: #f1f1f1;
-            border-radius: 10px;
-        }
-        
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #888;
-            border-radius: 10px;
-        }
-        
-        .dark .custom-scrollbar::-webkit-scrollbar-track {
-            background: #374151;
-        }
-        
-        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #6b7280;
-        }
-        
-        .toast {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            padding: 12px 16px;
-            border-radius: 8px;
-            color: white;
-            z-index: 1000;
-            animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in 2.7s forwards;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        
-        @keyframes slideIn {
-            from { transform: translateX(100%); opacity: 0; }
-            to { transform: translateX(0); opacity: 1; }
-        }
-        
-        @keyframes fadeOut {
-            to { opacity: 0; }
-        }
-        
-        .toast-success {
-            background-color: #10B981;
-        }
-        
-        .toast-error {
-            background-color: #EF4444;
-        }
-        
-        .toast-info {
-            background-color: #3B82F6;
-        }
-        
-        .line-clamp-2 {
-            display: -webkit-box;
-            -webkit-line-clamp: 2;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-        .line-clamp-3 {
-            display: -webkit-box;
-            -webkit-line-clamp: 3;
-            -webkit-box-orient: vertical;
-            overflow: hidden;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NewsFlow - G1 Feeds</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com?plugins=typography"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.22.5/babel.min.js"></script>
+  <style>
+    body { transition: background-color 0.3s ease, color 0.3s ease; }
+    .news-card-hover { border: 2px solid transparent; transition: border-color 0.3s ease, transform 0.3s ease, box-shadow 0.3s ease; }
+    .news-card-hover:hover {}
+    .news-count-badge { min-width: 2rem; }
+  </style>
 </head>
-<body class="bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200 transition-colors duration-200 min-h-screen">
-    <!-- Header -->
-    <header class="sticky top-0 z-10 bg-white/80 dark:bg-gray-800/80 backdrop-blur-md shadow-sm">
-        <div class="container mx-auto px-4 py-3 flex items-center justify-between">
-            <div class="flex items-center space-x-2">
-                <i class="fas fa-newspaper text-2xl text-primary-600 dark:text-primary-400"></i>
-                <h1 class="text-xl font-bold text-primary-600 dark:text-primary-400">NewsFlow</h1>
-            </div>
-            
-            <div class="flex items-center space-x-4">
-                <button id="theme-toggle" aria-label="Alternar tema claro/escuro" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                    <i class="fas fa-moon dark:hidden"></i>
-                    <i class="fas fa-sun hidden dark:inline"></i>
-                </button>
-                
-                <button id="refresh-btn" aria-label="Atualizar notícias" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                    <i class="fas fa-sync-alt"></i>
-                </button>
-                
-                <button id="settings-btn" aria-label="Abrir configurações" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors">
-                    <i class="fas fa-cog"></i>
-                </button>
-                
-                <button id="filter-btn" aria-label="Abrir filtros (móvel)" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors md:hidden">
-                    <i class="fas fa-filter"></i>
-                </button>
-            </div>
-        </div>
-    </header>
+<body class="min-h-screen flex flex-col font-sans">
+  <div id="root"></div>
 
-    <!-- Search Bar -->
-    <div class="container mx-auto px-4 py-4">
-        <div class="relative max-w-2xl mx-auto">
-            <input type="text" id="search-input" placeholder="Buscar notícias..."
-                    class="w-full pl-10 pr-4 py-2 rounded-full border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all">
-            <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
-        </div>
-    </div>
+  <script type="text/babel">
+    // --- Configuração dos Feeds RSS (mantido) ---
+    const rssFeeds = { /* ...objeto rssFeeds mantido... */
+        "Todas": "https://g1.globo.com/dynamo/rss2.xml",
+        "Brasil": "https://g1.globo.com/dynamo/brasil/rss2.xml",
+        "Carros": "https://g1.globo.com/dynamo/carros/rss2.xml",
+        "Ciência e Saúde": "https://g1.globo.com/dynamo/ciencia-e-saude/rss2.xml",
+        "Concursos": "https://g1.globo.com/dynamo/concursos-e-emprego/rss2.xml",
+        "Economia": "https://g1.globo.com/dynamo/economia/rss2.xml",
+        "Mundo": "https://g1.globo.com/dynamo/mundo/rss2.xml",
+        "Música": "https://g1.globo.com/dynamo/musica/rss2.xml",
+        "Natureza": "https://g1.globo.com/dynamo/natureza/rss2.xml",
+        "Planeta Bizarro": "https://g1.globo.com/dynamo/planeta-bizarro/rss2.xml",
+        "Política": "https://g1.globo.com/dynamo/politica/mensalao/rss2.xml", // Manter ou achar feed geral?
+        "Pop & Arte": "https://g1.globo.com/dynamo/pop-arte/rss2.xml",
+        "Tecnologia": "https://g1.globo.com/dynamo/tecnologia/rss2.xml",
+        "Turismo": "https://g1.globo.com/dynamo/turismo-e-viagem/rss2.xml",
+    };
 
-    <!-- Categories (Desktop) -->
-    <div id="categories-container" class="container mx-auto px-4 py-2 overflow-x-auto scrollbar-hide hidden md:block">
-        <div class="flex space-x-2">
-            <button class="category-btn px-4 py-1 rounded-full bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300 font-medium whitespace-nowrap" data-category="all">Todas</button>
-            <button class="category-btn px-4 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap" data-category="brasil">Brasil</button>
-            <button class="category-btn px-4 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap" data-category="mundo">Mundo</button>
-            <button class="category-btn px-4 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap" data-category="politica">Política</button>
-            <button class="category-btn px-4 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap" data-category="economia">Economia</button>
-            <button class="category-btn px-4 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap" data-category="tecnologia">Tecnologia</button>
-            <button class="category-btn px-4 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap" data-category="esportes">Esportes</button>
-            <button class="category-btn px-4 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap" data-category="saude">Saúde</button>
-            <button class="category-btn px-4 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap" data-category="entretenimento">Entretenimento</button>
-            <button class="category-btn px-4 py-1 rounded-full bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 whitespace-nowrap" data-category="ciencia">Ciência</button>
-        </div>
-    </div>
+    // --- NOVO Proxy CORS ---
+    // Tentativa com corsproxy.io. REMOVA ou SUBSTITUA em produção!
+    const CORS_PROXY = "https://corsproxy.io/?";
+    // const CORS_PROXY = "https://api.allorigins.win/raw?url="; // Outra alternativa comum
 
-    <!-- Filter Dropdown (Mobile) -->
-    <div id="filter-dropdown" class="hidden fixed inset-0 z-20 bg-black/50 md:hidden" role="dialog" aria-modal="true" aria-labelledby="filter-title">
-        <div class="absolute bottom-0 left-0 right-0 bg-white dark:bg-gray-800 rounded-t-2xl p-4 transform transition-transform duration-300 translate-y-full">
-            <div class="flex justify-between items-center mb-4">
-                <h3 id="filter-title" class="text-lg font-semibold">Filtrar Notícias</h3>
-                <button id="close-filter-btn" aria-label="Fechar filtros" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            
-            <div class="space-y-2">
-                <div>
-                    <label for="mobile-category-select" class="block text-sm font-medium mb-1">Categorias</label>
-                    <select id="mobile-category-select" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
-                        <option value="all">Todas</option>
-                        <option value="brasil">Brasil</option>
-                        <option value="mundo">Mundo</option>
-                        <option value="politica">Política</option>
-                        <option value="economia">Economia</option>
-                        <option value="tecnologia">Tecnologia</option>
-                        <option value="esportes">Esportes</option>
-                        <option value="saude">Saúde</option>
-                        <option value="entretenimento">Entretenimento</option>
-                        <option value="ciencia">Ciência</option>
-                    </select>
-                </div>
-                
-                <!-- Source Filter (can be dynamically populated later) -->
-                <!-- <div>
-                    <label for="mobile-source-select" class="block text-sm font-medium mb-1">Fontes</label>
-                    <select id="mobile-source-select" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
-                        <option value="all">Todas</option>
-                        <option value="g1">G1</option>
-                        <option value="uol">UOL</option>
-                         Add more sources dynamically
-                    </select>
-                </div> -->
-                
-                <button id="apply-filter-btn" class="w-full mt-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors">
-                    Aplicar Filtros
-                </button>
-            </div>
-        </div>
-    </div>
+    // Imagem Placeholder (mantido)
+    const PLACEHOLDER_IMAGE = "https://via.placeholder.com/600x400/cccccc/969696.png?text=Imagem+Indisponível";
 
-    <!-- Settings Panel -->
-    <div id="settings-panel" class="hidden fixed inset-0 z-30 bg-black/50" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-        <div class="absolute right-0 top-0 bottom-0 w-full max-w-md bg-white dark:bg-gray-800 shadow-xl transform transition-transform duration-300 translate-x-full overflow-y-auto custom-scrollbar">
-            <div class="p-6">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 id="settings-title" class="text-xl font-bold flex items-center">
-                        <i class="fas fa-cog mr-2"></i> Configurações
-                    </h2>
-                    <button id="close-settings-btn" aria-label="Fechar configurações" class="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                
-                <!-- Admin Login Section -->
-                <div id="admin-login-section" class="mb-8 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                    <h3 class="font-medium mb-3 flex items-center">
-                        <i class="fas fa-lock mr-2"></i> Acesso Administrativo
-                    </h3>
-                    
-                    <div id="login-form">
-                         <p class="text-xs text-red-500 mb-2">DEMO: Use usuário 'admin' e senha 'admin123'</p>
-                        <div class="mb-3">
-                            <label for="admin-username" class="block text-sm font-medium mb-1">Usuário</label>
-                            <input type="text" id="admin-username" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
-                        </div>
-                        <div class="mb-3">
-                            <label for="admin-password" class="block text-sm font-medium mb-1">Senha</label>
-                            <input type="password" id="admin-password" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
-                        </div>
-                        <button id="login-btn" class="w-full py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors">
-                            Entrar
-                        </button>
-                    </div>
-                    
-                    <div id="admin-controls" class="hidden">
-                        <div class="flex justify-between items-center mb-3">
-                            <span class="text-sm font-medium">Modo Administrador Ativo</span>
-                            <button id="logout-btn" class="text-sm text-primary-600 dark:text-primary-400 hover:underline">
-                                Sair
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- RSS Feeds Management -->
-                <div id="rss-management-section" class="mb-8 hidden">
-                    <h3 class="font-medium mb-3 flex items-center">
-                        <i class="fas fa-rss mr-2"></i> Gerenciamento de Feeds RSS
-                    </h3>
-                    
-                    <div class="mb-4">
-                        <button id="add-feed-btn" class="w-full py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors mb-3">
-                            <i class="fas fa-plus mr-2"></i> Adicionar Novo Feed
-                        </button>
-                        
-                        <div id="add-feed-form" class="hidden p-4 border border-gray-200 dark:border-gray-700 rounded-lg mb-4">
-                            <input type="hidden" id="editing-feed-id">
-                            <div class="mb-3">
-                                <label for="new-feed-name" class="block text-sm font-medium mb-1">Nome do Feed</label>
-                                <input type="text" id="new-feed-name" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
-                            </div>
-                            <div class="mb-3">
-                                <label for="new-feed-url" class="block text-sm font-medium mb-1">URL do Feed RSS</label>
-                                <input type="url" id="new-feed-url" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
-                            </div>
-                            <div class="mb-3">
-                                <label for="new-feed-category" class="block text-sm font-medium mb-1">Categoria</label>
-                                <select id="new-feed-category" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800">
-                                    <option value="brasil">Brasil</option>
-                                    <option value="mundo">Mundo</option>
-                                    <option value="politica">Política</option>
-                                    <option value="economia">Economia</option>
-                                    <option value="tecnologia">Tecnologia</option>
-                                    <option value="esportes">Esportes</option>
-                                    <option value="saude">Saúde</option>
-                                    <option value="entretenimento">Entretenimento</option>
-                                    <option value="ciencia">Ciência</option>
-                                </select>
-                            </div>
-                            <div class="flex space-x-2">
-                                <button id="save-feed-btn" class="flex-1 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors">
-                                    Salvar
-                                </button>
-                                <button id="cancel-feed-btn" type="button" class="flex-1 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-md transition-colors">
-                                    Cancelar
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div id="rss-feeds-list" class="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
-                        <div class="p-3 text-center text-gray-500">
-                            <i class="fas fa-lock mr-1"></i> Faça login para gerenciar feeds
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Fallback Images Management -->
-                <div id="fallback-images-section" class="mb-8 hidden">
-                    <h3 class="font-medium mb-3 flex items-center">
-                        <i class="fas fa-image mr-2"></i> Imagens Padrão (Fallback)
-                    </h3>
-                    
-                    <div class="mb-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                        <label for="global-fallback-image" class="block text-sm font-medium mb-2">Imagem Padrão Global</label>
-                        <div class="flex items-center space-x-2">
-                            <input type="url" id="global-fallback-image" placeholder="URL da imagem global"
-                                    class="flex-1 p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
-                            <button id="save-global-fallback" class="px-3 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors text-sm">
-                                Salvar
-                            </button>
-                        </div>
-                        <div id="current-global-fallback" class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                            Atual: <span id="current-global-fallback-url" class="break-all">Nenhuma definida</span>
-                        </div>
-                    </div>
-                    
-                    <div class="p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                        <label class="block text-sm font-medium mb-2">Imagens por Categoria</label>
-                        <div class="space-y-3" id="category-images-list">
-                             <div class="p-3 text-center text-gray-500">
-                                <i class="fas fa-lock mr-1"></i> Faça login para gerenciar imagens
-                            </div>
-                        </div>
-                         <button id="save-category-fallbacks" class="w-full mt-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors">
-                            Salvar Imagens de Categoria
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- App Settings -->
-                <div class="mb-8 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                    <h3 class="font-medium mb-3 flex items-center">
-                        <i class="fas fa-sliders-h mr-2"></i> Configurações Gerais
-                    </h3>
-                    
-                    <div class="space-y-4">
-                        <div class="flex items-center justify-between">
-                            <label for="default-theme" class="text-sm font-medium">Tema Padrão</label>
-                            <select id="default-theme" class="p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
-                                <option value="system">Seguir sistema</option>
-                                <option value="light">Claro</option>
-                                <option value="dark">Escuro</option>
-                            </select>
-                        </div>
-                        
-                        <div class="flex items-center justify-between">
-                            <label for="items-per-page" class="text-sm font-medium">Notícias por página</label>
-                            <select id="items-per-page" class="p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
-                                <option value="6">6</option>
-                                <option value="12">12</option>
-                                <option value="18">18</option>
-                                <option value="24">24</option>
-                            </select>
-                        </div>
-                        
-                        <div class="flex items-center justify-between">
-                            <label for="show-ads-toggle" class="text-sm font-medium">Mostrar anúncios</label>
-                            <label class="relative inline-flex items-center cursor-pointer">
-                                <input type="checkbox" id="show-ads-toggle" class="sr-only peer">
-                                <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 dark:peer-focus:ring-primary-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-primary-600"></div>
-                            </label>
-                        </div>
-                        
-                        <div class="flex items-center justify-between">
-                            <label for="ad-frequency" class="text-sm font-medium">Frequência de anúncios</label>
-                            <select id="ad-frequency" class="p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
-                                <option value="low">Baixa (15 cliques)</option>
-                                <option value="medium">Média (10 cliques)</option>
-                                <option value="high">Alta (5 cliques)</option>
-                            </select>
-                        </div>
-                        
-                        <button id="save-app-settings" class="w-full mt-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors">
-                            Salvar Configurações Gerais
-                        </button>
-                    </div>
-                </div>
-                
-                <!-- AdMob Settings -->
-                <div id="admob-settings-section" class="mb-8 p-4 border border-gray-200 dark:border-gray-700 rounded-lg hidden">
-                    <h3 class="font-medium mb-3 flex items-center">
-                        <i class="fas fa-ad mr-2"></i> Configurações do Google AdMob
-                    </h3>
-                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Insira os IDs das suas unidades de anúncio AdMob. Use IDs de teste se não tiver os reais.</p>
-                    
-                    <div class="space-y-3">
-                        <div class="mb-2">
-                            <label for="admob-app-id" class="block text-xs font-medium mb-1">App ID (Para Apps Nativos)</label>
-                            <input type="text" id="admob-app-id" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
-                        </div>
-                        <div class="mb-2">
-                            <label for="admob-banner-id" class="block text-xs font-medium mb-1">Banner Adaptativo (ID Unidade)</label>
-                            <input type="text" id="admob-banner-id" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
-                        </div>
-                        <div class="mb-2">
-                            <label for="admob-fixed-banner-id" class="block text-xs font-medium mb-1">Banner Fixo (ID Unidade)</label>
-                            <input type="text" id="admob-fixed-banner-id" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
-                        </div>
-                        <div class="mb-2">
-                            <label for="admob-interstitial-id" class="block text-xs font-medium mb-1">Intersticial (ID Unidade)</label>
-                            <input type="text" id="admob-interstitial-id" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
-                        </div>
-                        <div class="mb-2">
-                            <label for="admob-rewarded-id" class="block text-xs font-medium mb-1">Premiado (ID Unidade)</label>
-                            <input type="text" id="admob-rewarded-id" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
-                        </div>
-                        <div class="mb-2">
-                            <label for="admob-rewarded-interstitial-id" class="block text-xs font-medium mb-1">Intersticial Premiado (ID Unidade)</label>
-                            <input type="text" id="admob-rewarded-interstitial-id" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
-                        </div>
-                        <div class="mb-2">
-                            <label for="admob-native-id" class="block text-xs font-medium mb-1">Nativo (ID Unidade)</label>
-                            <input type="text" id="admob-native-id" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
-                        </div>
-                        <div class="mb-2">
-                            <label for="admob-native-video-id" class="block text-xs font-medium mb-1">Vídeo Nativo (ID Unidade)</label>
-                            <input type="text" id="admob-native-video-id" class="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
-                        </div>
-                        
-                        <button id="save-admob-settings" class="w-full mt-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors">
-                            Salvar IDs AdMob
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    // --- Utilitários (stripHtml, formatDate - mantidos) ---
+    const stripHtml = (html) => { /* ...código mantido... */
+         if (!html) return ""; const tmp = document.createElement("DIV"); tmp.innerHTML = html; return tmp.textContent || tmp.innerText || "";
+     }
+    const formatDate = (dateString) => { /* ...código mantido... */
+        try { const date = new Date(dateString); return date.toLocaleDateString("pt-BR", { day: '2-digit', month: 'short', year: 'numeric', }); } catch (e) { console.warn("Error formatting date:", dateString, e); return "Data inválida"; }
+     };
 
-    <!-- Main Content -->
-    <main class="container mx-auto px-4 py-6">
-        <!-- Loading Skeleton -->
-        <div id="loading-skeleton" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Skeleton items -->
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-                <div class="h-48 skeleton"></div>
-                <div class="p-4 space-y-3">
-                    <div class="flex space-x-2">
-                        <div class="h-5 w-16 rounded skeleton"></div>
-                        <div class="h-5 w-12 rounded skeleton"></div>
-                    </div>
-                    <div class="h-6 rounded skeleton"></div>
-                    <div class="h-4 rounded skeleton"></div>
-                    <div class="h-4 w-3/4 rounded skeleton"></div>
-                    <div class="flex justify-between items-center mt-2">
-                        <div class="h-4 w-20 rounded skeleton"></div>
-                        <div class="h-6 w-6 rounded-full skeleton"></div>
-                    </div>
-                </div>
-            </div>
-             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
-                <div class="h-48 skeleton"></div>
-                <div class="p-4 space-y-3">
-                    <div class="flex space-x-2">
-                        <div class="h-5 w-16 rounded skeleton"></div>
-                        <div class="h-5 w-12 rounded skeleton"></div>
-                    </div>
-                    <div class="h-6 rounded skeleton"></div>
-                    <div class="h-4 rounded skeleton"></div>
-                    <div class="h-4 w-3/4 rounded skeleton"></div>
-                     <div class="flex justify-between items-center mt-2">
-                        <div class="h-4 w-20 rounded skeleton"></div>
-                        <div class="h-6 w-6 rounded-full skeleton"></div>
-                    </div>
-                </div>
-            </div>
-             <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden hidden lg:block">
-                <div class="h-48 skeleton"></div>
-                <div class="p-4 space-y-3">
-                     <div class="flex space-x-2">
-                        <div class="h-5 w-16 rounded skeleton"></div>
-                        <div class="h-5 w-12 rounded skeleton"></div>
-                    </div>
-                    <div class="h-6 rounded skeleton"></div>
-                    <div class="h-4 rounded skeleton"></div>
-                    <div class="h-4 w-3/4 rounded skeleton"></div>
-                     <div class="flex justify-between items-center mt-2">
-                        <div class="h-4 w-20 rounded skeleton"></div>
-                        <div class="h-6 w-6 rounded-full skeleton"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- News Grid -->
-        <div id="news-grid" class="hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- News cards will be inserted here by JavaScript -->
-        </div>
-        
-        <!-- Load More Button -->
-        <div id="load-more-container" class="mt-8 text-center hidden">
-            <button id="load-more-btn" class="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors">
-                Carregar Mais Notícias
-            </button>
-        </div>
-        
-        <!-- No Results Message -->
-        <div id="no-results" class="hidden text-center py-12">
-            <i class="fas fa-newspaper text-4xl text-gray-400 mb-4"></i>
-            <h3 class="text-xl font-medium text-gray-600 dark:text-gray-300">Nenhuma notícia encontrada</h3>
-            <p class="text-gray-500 dark:text-gray-400 mt-2">Tente ajustar seus filtros ou buscar por palavras diferentes.</p>
-        </div>
-    </main>
+    // --- Gerenciamento de Speech Synthesis (speechManager - mantido) ---
+    const speechManager = { /* ...código mantido... */
+         utterance: null, isSpeaking: false, speakingItemId: null,
+        speak: function(text, itemId, onEndCallback) { if (!('speechSynthesis' in window)) { alert("Seu navegador não suporta leitura por voz."); return; } if (this.isSpeaking && this.speakingItemId === itemId) { window.speechSynthesis.cancel(); return; } if(window.speechSynthesis.speaking) { window.speechSynthesis.cancel(); } const cleanText = stripHtml(text); if (!cleanText) return; this.utterance = new SpeechSynthesisUtterance(cleanText); this.utterance.lang = 'pt-BR'; const voices = window.speechSynthesis.getVoices(); const portugueseVoice = voices.find(voice => voice.lang === 'pt-BR'); if (portugueseVoice) this.utterance.voice = portugueseVoice; this.utterance.onstart = () => { this.isSpeaking = true; this.speakingItemId = itemId; }; this.utterance.onend = () => { if (this.speakingItemId === itemId) { this.isSpeaking = false; this.speakingItemId = null; this.utterance = null; onEndCallback(); } }; this.utterance.onerror = (event) => { console.error("SpeechSynthesis Error:", event); if (this.speakingItemId === itemId) { this.isSpeaking = false; this.speakingItemId = null; this.utterance = null; onEndCallback(); alert(`Erro na leitura: ${event.error}`); } }; window.speechSynthesis.speak(this.utterance); },
+        cancel: function(onEndCallback) { if (window.speechSynthesis.speaking || this.utterance) { window.speechSynthesis.cancel(); this.isSpeaking = false; this.speakingItemId = null; this.utterance = null; if (onEndCallback) onEndCallback(); } },
+        loadVoices: function() { if ('speechSynthesis' in window && window.speechSynthesis.onvoiceschanged !== undefined) { window.speechSynthesis.onvoiceschanged = () => { console.log("Voices loaded:", window.speechSynthesis.getVoices().length); }; window.speechSynthesis.getVoices(); } }
+    };
 
-    <!-- Ad Banner (Simulation) -->
-    <div class="bg-gray-100 dark:bg-gray-800 py-4 mt-8">
-        <div class="container mx-auto px-4">
-            <div class="bg-white dark:bg-gray-700 rounded-lg p-4 text-center">
-                <p class="text-sm text-gray-500 dark:text-gray-400 mb-2">Publicidade (Simulação)</p>
-                <div id="ad-banner" class="h-20 bg-gray-200 dark:bg-gray-600 rounded flex items-center justify-center">
-                    <p class="text-gray-500 dark:text-gray-400">Banner Adaptativo (AdMob ID: <span id="sim-banner-id">...</span>)</p>
-                </div>
-            </div>
-        </div>
-    </div>
+    // --- Dados Estáticos (Exemplo para Top 10 no Modal) ---
+    // Mantido apenas para o modal, não para a lista principal
+    const topTenNews = [
+        { id: 101, title: "Avanço na cura do câncer é anunciado", source: "BBC", category: "Saúde", image: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?q=80&w=100&auto=format&fit=crop" },
+        { id: 102, title: "Novo recorde nas Olimpíadas", source: "ESPN", category: "Esportes", image: "https://images.unsplash.com/photo-1552673597-e3e352297b5c?q=80&w=100&auto=format&fit=crop" },
+        { id: 103, title: "Acordo global reduz emissões", source: "Reuters", category: "Mundo", image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?q=80&w=100&auto=format&fit=crop" },
+        { id: 104, title: "IA generativa transforma educação", source: "TechCrunch", category: "Tecnologia", image: "https://images.unsplash.com/photo-1516321310764-959200eb3b04?q=80&w=100&auto=format&fit=crop" },
+        { id: 105, title: "Filme brasileiro ganha prêmio", source: "Variety", category: "Entretenimento", image: "https://images.unsplash.com/photo-1485846234645-a62644f84728?q=80&w=100&auto=format&fit=crop" },
+        { id: 106, title: "PIB global cresce", source: "Financial Times", category: "Economia", image: "https://images.unsplash.com/photo-1611974789855-9c2a0a7236aa?q=80&w=100&auto=format&fit=crop" },
+        { id: 107, title: "Nova espécie marinha descoberta", source: "NatGeo", category: "Ciência", image: "https://images.unsplash.com/photo-1564769609132-0b8c2d11b254?q=80&w=100&auto=format&fit=crop" },
+        { id: 108, title: "Reforma política aprovada", source: "Estadão", category: "Política", image: "https://images.unsplash.com/photo-1560167084-5a8e9d1149eb?q=80&w=100&auto=format&fit=crop" },
+        { id: 109, title: "Vacina universal contra gripe avança", source: "The Guardian", category: "Saúde", image: "https://images.unsplash.com/photo-1607619056574-7b8d3b81886e?q=80&w=100&auto=format&fit=crop" },
+        { id: 110, title: "Satélite brasileiro lançado", source: "Globo", category: "Tecnologia", image: "https://images.unsplash.com/photo-1636819488524-1f022c4ebed8?q=80&w=100&auto=format&fit=crop" }
+    ];
 
-    <!-- News Modal -->
-    <div id="news-modal" class="hidden fixed inset-0 z-30 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-        <div class="modal-overlay absolute inset-0"></div>
-        
-        <div class="relative min-h-screen flex items-center justify-center p-4">
-            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] flex flex-col">
-                 <!-- Modal Header -->
-                <div class="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-start">
-                    <div>
-                        <span id="modal-category" class="inline-block px-2 py-1 text-xs font-medium rounded-full bg-primary-100 dark:bg-primary-900 text-primary-700 dark:text-primary-300"></span>
-                        <span id="modal-source" class="inline-block px-2 py-1 ml-2 text-xs font-medium rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300"></span>
-                    </div>
-                    <button id="close-modal-btn" aria-label="Fechar notícia" class="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700 -mt-1 -mr-1">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                
-                <!-- Modal Content -->
-                <div class="p-6 overflow-y-auto flex-grow">
-                    <h2 id="modal-title" class="text-2xl font-bold mb-3"></h2>
-                    <p id="modal-date" class="text-sm text-gray-500 dark:text-gray-400 mb-4"></p>
-                    
-                    <div id="modal-image-container" class="mb-6 rounded-lg overflow-hidden">
-                        <img id="modal-image" src="" alt="" class="w-full h-48 md:h-64 object-cover">
-                    </div>
-                    
-                    <div id="modal-content" class="prose dark:prose-invert max-w-none mb-6 line-clamp-3"></div>
-                </div>
-                
-                <!-- Modal Footer -->
-                <div class="p-4 border-t border-gray-200 dark:border-gray-700">
-                     <div class="flex flex-wrap gap-3 mb-4">
-                        <a id="full-article-btn" href="#" target="_blank" rel="noopener noreferrer" class="flex-1 text-center px-4 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors text-sm sm:flex-none">
-                            <i class="fas fa-external-link-alt mr-1"></i> Ler Completa
-                        </a>
-                        <button id="speak-btn" class="flex-1 text-center px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-md transition-colors text-sm sm:flex-none">
-                            <i class="fas fa-volume-up mr-1"></i> Ouvir
-                        </button>
-                        <button id="share-btn" class="flex-1 text-center px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 rounded-md transition-colors text-sm sm:flex-none">
-                            <i class="fas fa-share-alt mr-1"></i> Compartilhar
-                        </button>
-                    </div>
-                    
-                    <!-- Ad in Modal (Simulation) -->
-                    <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Publicidade (Simulação)</p>
-                        <div id="modal-ad" class="h-16 bg-gray-200 dark:bg-gray-600 rounded flex items-center justify-center">
-                            <p class="text-gray-500 dark:text-gray-400 text-sm">Banner Adaptativo (AdMob)</p>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
 
-    <!-- Interstitial Ad (Simulation - Hidden) -->
-    <div id="interstitial-ad" class="hidden fixed inset-0 z-40 bg-black/90 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="interstitial-title">
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md mx-4 text-center">
-             <button id="force-close-ad-btn" aria-label="Fechar anúncio" class="absolute top-2 right-2 p-2 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full z-50">
-                 <i class="fas fa-times"></i>
-            </button>
-            <div class="text-center mb-4">
-                <i class="fas fa-ad text-4xl text-primary-600 dark:text-primary-400 mb-3"></i>
-                <h3 id="interstitial-title" class="text-xl font-bold mb-2">Anúncio</h3>
-                <p class="text-gray-600 dark:text-gray-300 text-sm">Aguarde ou feche para continuar. Seu apoio é importante!</p>
-            </div>
-            
-            <div class="h-60 bg-gray-200 dark:bg-gray-700 rounded flex items-center justify-center mb-4">
-                <p class="text-gray-500 dark:text-gray-400">Simulação Anúncio Intersticial (AdMob)</p>
-            </div>
-            
-            <div class="flex justify-center">
-                 <button id="close-ad-btn" class="px-6 py-2 bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors opacity-50 cursor-not-allowed" disabled>
-                    Fechar Anúncio (<span id="ad-timer">5</span>s)
-                </button>
-            </div>
-        </div>
-    </div>
+    // --- Componentes React ---
 
-    <!-- Toast Notification Container -->
-    <div id="toast-container"></div>
+    // AdBanner, AdCard, PremiumAdModal (mantidos)
+    const AdBanner = ({ position, isDarkMode }) => { /* ...código mantido... */
+         return ( <div className={`py-4 px-6 rounded-lg shadow-md text-center ${isDarkMode ? "bg-gray-700 text-gray-200" : "bg-gray-100 text-gray-800"}`}> <p className="text-base font-semibold"> {position === "top" ? "Anúncio Simulado - Topo" : position === "modal" ? "Anúncio Simulado - Modal" : position === "premium-modal" ? "Anúncio Simulado - Premium" : "Anúncio Simulado - Rodapé"} </p> <p className="text-sm mt-2"> {position === "top" ? "Descubra as melhores ofertas!" : position === "modal" ? "Confira nossas novidades!" : position === "premium-modal" ? "Aproveite sem interrupções!" : "Explore mais conteúdos!"} </p> <a href="#" className={`inline-block mt-3 px-5 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${isDarkMode ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-blue-500 text-white hover:bg-blue-600"}`} onClick={(e) => e.preventDefault()} > Saiba mais </a> </div> );
+     };
+    const AdCard = ({ isDarkMode }) => { /* ...código mantido... */
+         return ( <div className={`rounded-lg overflow-hidden shadow-lg flex flex-col h-full p-5 text-center news-card-hover ${isDarkMode ? "bg-gray-800 text-gray-200 hover:border-gray-600" : "bg-white text-gray-800 hover:border-gray-300"}`}> <div className="flex-grow flex flex-col items-center justify-center"> <p className="text-lg font-bold mb-2">Espaço Publicitário</p> <p className={`text-sm mb-4 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}> Anuncie aqui! </p> <a href="#" className={`inline-block px-5 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${ isDarkMode ? "bg-green-600 text-white hover:bg-green-700" : "bg-green-500 text-white hover:bg-green-600" }`} onClick={(e) => e.preventDefault()} > Anuncie Conosco </a> </div> </div> );
+     };
+     const PremiumAdModal = ({ onClose, isDarkMode }) => { /* ...código mantido... */
+         const handleBuyPremium = () => { alert("Compra Premium..."); onClose(); }; const handleWatchAds = () => { alert("Assistir Ads..."); onClose(); }; return ( <div className={`fixed inset-0 flex items-center justify-center z-50 ${isDarkMode ? "bg-gray-900 bg-opacity-75" : "bg-gray-100 bg-opacity-75"}`}> <div className={`rounded-lg shadow-xl p-6 max-w-md w-full ${isDarkMode ? "bg-gray-800 text-white" : "bg-white text-gray-800"}`}> <div className="flex justify-between items-center mb-4"> <h2 className="text-xl font-bold">NewsFlow Premium!</h2> <button onClick={onClose} className={`p-1 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-400 hover:text-white hover:bg-gray-700" : "text-gray-600 hover:text-gray-800 hover:bg-gray-200"}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /> </svg> </button> </div> <p className={`text-sm mb-4 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}> Experiência sem anúncios. Escolha uma opção: </p> <div className="mb-6"> <AdBanner position="premium-modal" isDarkMode={isDarkMode} /> </div> <div className="flex flex-col space-y-4"> <button onClick={handleBuyPremium} className={`w-full px-5 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${ isDarkMode ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-blue-500 text-white hover:bg-blue-600" }`} > Comprar (R$ 4,90) </button> <button onClick={handleWatchAds} className={`w-full px-5 py-3 rounded-lg text-sm font-medium transition-colors duration-200 ${ isDarkMode ? "bg-gray-600 text-white hover:bg-gray-700" : "bg-gray-300 text-gray-800 hover:bg-gray-400" }`} > Ver 4 anúncios (Grátis 24h) </button> </div> </div> </div> );
+     };
 
-    <script>
-        // --- Polyfill for structuredClone (if needed for older browsers) ---
-        if (typeof structuredClone === 'undefined') {
-             window.structuredClone = (obj) => JSON.parse(JSON.stringify(obj));
-        }
-        
-        // --- Sample Data & Defaults (Replace with actual data fetching later) ---
-        const sampleNews = [
-            // ... (kept your sample data)
-             {
-                id: 1,
-                title: "Novo plano econômico é anunciado pelo governo federal",
-                description: "O governo anunciou hoje um novo pacote de medidas para impulsionar a economia brasileira, com foco em redução de impostos para pequenas empresas.",
-                category: "economia",
-                source: "g1",
-                date: "2023-06-15T10:30:00Z",
-                image: "https://source.unsplash.com/random/600x400/?economy",
-                url: "https://g1.globo.com/economia/noticia/2023/06/15/novo-plano-economico.ghtml"
-            },
-            {
-                id: 2,
-                title: "Seleção Brasileira vence amistoso contra Argentina",
-                description: "Em jogo emocionante, Brasil vence Argentina por 2 a 1 em preparação para a Copa do Mundo. Neymar marca gol decisivo nos acréscimos.",
-                category: "esportes",
-                source: "uol",
-                date: "2023-06-14T22:15:00Z",
-                image: "https://source.unsplash.com/random/600x400/?soccer",
-                url: "https://www.uol.com.br/esporte/futebol/ultimas-noticias/2023/06/14/brasil-argentina-amistoso.htm"
-            },
-            {
-                id: 3,
-                title: "Pesquisadores descobrem possível tratamento para Alzheimer",
-                description: "Cientistas anunciam avanço promissor no tratamento do Alzheimer com nova droga que reduziu em 60% o avanço da doença em testes clínicos.",
-                category: "saude",
-                source: "bbc",
-                date: "2023-06-14T18:45:00Z",
-                image: "https://source.unsplash.com/random/600x400/?health",
-                url: "https://www.bbc.com/news/health-12345678"
-            },
-             {
-                id: 4,
-                title: "Novo smartphone com tela dobrável é lançado no mercado",
-                description: "Fabricante coreana lança novo modelo de smartphone com tela dobrável e câmera de 200MP. Preço inicial será de US$ 1.500.",
-                category: "tecnologia",
-                source: "cnn",
-                date: "2023-06-13T14:20:00Z",
-                image: "https://source.unsplash.com/random/600x400/?smartphone",
-                url: "https://www.cnn.com/tech/new-foldable-phone"
-            },
-             {
-                id: 5,
-                title: "Festival de música atrai milhares no Rio de Janeiro",
-                description: "Mais de 100 mil pessoas compareceram ao primeiro dia do festival que reúne artistas nacionais e internacionais na capital fluminense.",
-                category: "entretenimento",
-                source: "g1",
-                date: "2023-06-12T09:10:00Z",
-                image: "https://source.unsplash.com/random/600x400/?music",
-                url: "https://g1.globo.com/rj/rio-de-janeiro/noticia/2023/06/12/festival-musica-rio.ghtml"
-            },
-             {
-                id: 6,
-                title: "Conflito na Ucrânia: novas negociações de paz são marcadas",
-                description: "Rússia e Ucrânia concordam em nova rodada de negociações após meses de impasse. Encontro será mediado pela ONU na próxima semana.",
-                category: "mundo",
-                source: "bbc",
-                date: "2023-06-11T16:30:00Z",
-                image: "https://source.unsplash.com/random/600x400/?ukraine",
-                url: "https://www.bbc.com/news/world-europe-12345678"
-            },
-             {
-                id: 7,
-                title: "Projeto de lei sobre educação é aprovado no Congresso",
-                description: "Depois de meses de debates, projeto que reforma o ensino médio é aprovado com ampla maioria. Mudanças devem começar no próximo ano letivo.",
-                category: "politica",
-                source: "uol",
-                date: "2023-06-10T12:45:00Z",
-                image: "https://source.unsplash.com/random/600x400/?school",
-                url: "https://www.uol.com.br/politica/ultimas-noticias/2023/06/10/projeto-educacao-aprovado.htm"
-            },
-             {
-                id: 8,
-                title: "Nova espécie de dinossauro é descoberta no Brasil",
-                description: "Paleontólogos brasileiros anunciam descoberta de fóssil de dinossauro carnívoro de 80 milhões de anos no interior do Ceará.",
-                category: "ciencia",
-                source: "g1",
-                date: "2023-06-09T11:20:00Z",
-                image: "https://source.unsplash.com/random/600x400/?dinosaur",
-                url: "https://g1.globo.com/ciencia/noticia/2023/06/09/nova-especie-dinossauro.ghtml"
-            },
-             {
-                id: 9,
-                title: "Inflação oficial fecha abaixo do esperado em maio",
-                description: "Índice de preços ao consumidor registra alta de 0,35% em maio, abaixo da previsão do mercado. Alimentos e transportes puxam desaceleração.",
-                category: "economia",
-                source: "cnn",
-                date: "2023-06-08T08:15:00Z",
-                image: "https://source.unsplash.com/random/600x400/?money",
-                url: "https://www.cnn.com/economy/inflation-may"
-            },
-             {
-                id: 10,
-                title: "Temporada de furacões no Atlântico começa com alertas",
-                description: "Primeira tempestade tropical da temporada se forma no Caribe. Especialistas preveem temporada mais intensa que a média este ano.",
-                category: "mundo",
-                source: "bbc",
-                date: "2023-06-07T15:40:00Z",
-                image: "https://source.unsplash.com/random/600x400/?hurricane",
-                url: "https://www.bbc.com/news/world-latin-america-12345678"
-            },
-             {
-                id: 11,
-                title: "Brasil registra recorde na geração de energia solar",
-                description: "Capacidade instalada de energia solar fotovoltaica no país ultrapassa 30 GW, com crescimento de 50% no último ano.",
-                category: "tecnologia",
-                source: "g1",
-                date: "2023-06-06T13:25:00Z",
-                image: "https://source.unsplash.com/random/600x400/?solar",
-                url: "https://g1.globo.com/economia/noticia/2023/06/06/energia-solar-recorde.ghtml"
-            },
-             {
-                id: 12,
-                title: "Novo tratamento para câncer de mama mostra eficácia",
-                description: "Estudo internacional com participação brasileira mostra que nova terapia aumenta sobrevida em casos avançados de câncer de mama.",
-                category: "saude",
-                source: "uol",
-                date: "2023-06-05T10:50:00Z",
-                image: "https://source.unsplash.com/random/600x400/?hospital",
-                url: "https://www.uol.com.br/vivabem/ultimas-noticias/2023/06/05/tratamento-cancer-mama.htm"
-            }
-        ];
+    // Navigation (mantido)
+    const Navigation = ({ onCategoryChange, activeCategory, isDarkMode }) => { /* ...código mantido com ícones válidos... */
+        const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+        const navItems = [ { label: "Todas", icon: "M3 12h18M3 6h18M3 18h18" }, { label: "Brasil", icon: "M15 12a3 3 0 11-6 0 3 3 0 016 0z M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }, { label: "Carros", icon: "M19 7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V7z" }, { label: "Ciência e Saúde", icon: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" }, { label: "Concursos", icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" }, { label: "Economia", icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }, { label: "Mundo", icon: "M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" }, { label: "Música", icon: "M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2z" }, { label: "Natureza", icon: "M17.657 18.657l-4.243-4.243M6.343 5.343l4.243 4.243M17.657 5.343l-4.243 4.243M6.343 18.657l4.243-4.243M12 16a4 4 0 110-8 4 4 0 010 8z" }, { label: "Planeta Bizarro", icon: "M12 14l9-5-9-5-9 5 9 5zm0 7l9-5-9-5-9 5 9 5z" }, { label: "Política", icon: "M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z" }, { label: "Pop & Arte", icon: "M7 4v16M17 4v16M3 8h4m10 0h4M3 12h18M3 16h4m10 0h4M4 20h16a1 1 0 001-1V5a1 1 0 00-1-1H4a1 1 0 00-1 1v14a1 1 0 001 1z" }, { label: "Tecnologia", icon: "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" }, { label: "Turismo", icon: "M17.657 4.343a8 8 0 11-11.314 11.314L12 21.213l5.657-5.556a8 8 0 010-11.314zM12 12a3 3 0 100-6 3 3 0 000 6z" }, { label: "Favoritos", icon: "M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z", iconClass: isDarkMode ? "text-red-500" : "text-red-600" } ];
+        return ( <nav className={`p-4 rounded-lg shadow-lg ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}> <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"> <div className="flex justify-between items-center sm:hidden"> <span className={`font-semibold ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>Categorias</span> <button onClick={() => setIsMenuOpen(!isMenuOpen)} className={`p-2 rounded-lg ${isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-700 hover:bg-gray-300"}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={isMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h16"} /> </svg> </button> </div> {isMenuOpen && ( <div className="sm:hidden mt-2 space-y-1"> {navItems.map((item, index) => ( <button key={index} onClick={() => { onCategoryChange(item.label); setIsMenuOpen(false); }} className={`flex items-center w-full p-3 rounded-lg transition-all duration-200 text-left ${ activeCategory === item.label ? (isDarkMode ? "bg-blue-600 text-white" : "bg-blue-500 text-white") : (isDarkMode ? "text-gray-300 hover:bg-gray-700" : "text-gray-700 hover:bg-gray-300") }`} > <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 flex-shrink-0 ${item.iconClass || ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} /> </svg> <span className="ml-3 text-sm font-medium">{item.label}</span> </button> ))} </div> )} <div className="hidden sm:flex flex-wrap justify-center gap-2"> {navItems.map((item, index) => ( <button key={index} onClick={() => onCategoryChange(item.label)} title={item.label} className={`flex items-center p-2 rounded-lg transition-all duration-300 group relative ${ activeCategory === item.label ? (isDarkMode ? "bg-blue-600 text-white shadow-md" : "bg-blue-500 text-white shadow-md") : (isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-blue-400" : "text-gray-700 hover:bg-gray-300 hover:text-blue-600") }`} > <svg xmlns="http://www.w3.org/2000/svg" className={`h-6 w-6 flex-shrink-0 ${item.iconClass || ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={item.icon} /> </svg> <span className="ml-2 text-sm font-medium hidden md:inline">{item.label}</span> </button> ))} </div> </div> </nav> );
+    };
 
-        const defaultRssFeeds = [
-            { id: 1, name: "G1 Brasil", url: "https://g1.globo.com/rss/g1/brasil/", category: "brasil", active: true },
-            { id: 2, name: "UOL Últimas Notícias", url: "https://noticias.uol.com.br/ultimas-noticias/rss.xml", category: "brasil", active: true },
-            { id: 3, name: "Folha de S.Paulo", url: "https://feeds.folha.uol.com.br/emcimadahora/rss091.xml", category: "brasil", active: true },
-            { id: 4, name: "Estadão", url: "https://www.estadao.com.br/feed/", category: "brasil", active: true },
-            { id: 5, name: "CNN Brasil", url: "https://www.cnnbrasil.com.br/feed/", category: "brasil", active: true },
-            { id: 6, name: "BBC Mundo", url: "https://feeds.bbci.co.uk/news/world/rss.xml", category: "mundo", active: true },
-            { id: 7, name: "CNN Internacional", url: "http://rss.cnn.com/rss/edition.rss", category: "mundo", active: true },
-            { id: 8, name: "Exame Economia", url: "https://exame.com/feed/", category: "economia", active: true },
-            { id: 9, name: "Valor Econômico", url: "https://valor.globo.com/rss/valor", category: "economia", active: true },
-            { id: 10, name: "Olhar Digital", url: "https://olhardigital.com.br/feed/", category: "tecnologia", active: true },
-            { id: 11, name: "TechCrunch", url: "https://techcrunch.com/feed/", category: "tecnologia", active: true },
-            { id: 12, name: "Globo Esporte", url: "https://ge.globo.com/rss/ge/", category: "esportes", active: true },
-            { id: 13, name: "ESPN Brasil", url: "https://www.espn.com.br/rss", category: "esportes", active: true },
-            { id: 14, name: "BBC Brasil", url: "https://www.bbc.com/portuguese/index.xml", category: "brasil", active: true },
-            { id: 15, name: "The Guardian", url: "https://www.theguardian.com/international/rss", category: "mundo", active: true }
-            // Add other default feeds here if needed
-        ];
+    // SearchAndFilters (mantido)
+    const SearchAndFilters = ({ searchQuery, setSearchQuery, sortBy, setSortBy, handleRefresh, isDarkMode, isLoading }) => { /* ...código mantido... */
+        return ( <div className={`p-4 rounded-lg shadow-md ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}> <div className="flex flex-col sm:flex-row sm:items-center gap-4"> <div className="flex-grow relative"> <input type="text" placeholder="Buscar notícias..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className={`w-full h-10 p-3 pl-10 rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${ isDarkMode ? "bg-gray-700 text-white placeholder-gray-400 focus:ring-blue-500" : "bg-gray-300 text-gray-800 placeholder-gray-600 focus:ring-blue-400" }`} /> <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 absolute left-3 top-1/2 transform -translate-y-1/2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /> </svg> </div> <div className="flex flex-col sm:flex-row gap-3 items-center flex-shrink-0"> <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className={`h-10 p-2 rounded-lg focus:outline-none focus:ring-2 transition-all duration-200 ${ isDarkMode ? "bg-gray-700 text-white focus:ring-blue-500" : "bg-gray-300 text-gray-800 focus:ring-blue-400" }`} > <option value="newest">Recentes</option> <option value="oldest">Antigos</option> <option value="title-asc">Título A-Z</option> <option value="title-desc">Título Z-A</option> </select> <button onClick={handleRefresh} disabled={isLoading} className={`h-10 flex items-center justify-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${ isDarkMode ? "bg-blue-500 text-white hover:bg-blue-600 disabled:bg-blue-700 disabled:opacity-70" : "bg-blue-400 text-white hover:bg-blue-500 disabled:bg-blue-300 disabled:opacity-70" }`} > {isLoading ? ( <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"> <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle> <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path> </svg> ) : ( <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /> </svg> )} {isLoading ? 'Atualizando...' : 'Atualizar'} </button> </div> </div> </div> );
+    };
 
-        const defaultCategoryFallbackImages = {
-            global: "https://via.placeholder.com/600x400/cccccc/969696.png?text=Sem+Imagem",
-            brasil: "https://source.unsplash.com/random/600x400/?brazil",
-            mundo: "https://source.unsplash.com/random/600x400/?world",
-            politica: "https://source.unsplash.com/random/600x400/?politics",
-            economia: "https://source.unsplash.com/random/600x400/?economy",
-            tecnologia: "https://source.unsplash.com/random/600x400/?technology",
-            esportes: "https://source.unsplash.com/random/600x400/?sports",
-            saude: "https://source.unsplash.com/random/600x400/?health",
-            entretenimento: "https://source.unsplash.com/random/600x400/?entertainment",
-            ciencia: "https://source.unsplash.com/random/600x400/?science"
-        };
+    // NewsCard (mantido)
+    const NewsCard = ({ news, onOpenModal, isDarkMode, toggleFavorite, isFavorited, currentlySpeakingId, setCurrentlySpeakingId }) => { /* ...código mantido... */
+        const isCurrentlySpeaking = news.id === currentlySpeakingId; const handleSpeakClick = (event) => { event.stopPropagation(); if (!news.title) return; speechManager.speak(news.title, news.id, () => { setCurrentlySpeakingId(null); }); setCurrentlySpeakingId(speechManager.isSpeaking ? news.id : null); }; const hoverBorderColorClass = isDarkMode ? 'hover:border-blue-400' : 'hover:border-blue-500'; return ( <div className={`news-card-hover ${hoverBorderColorClass} rounded-lg overflow-hidden shadow-lg hover:shadow-2xl transform hover:-translate-y-1 flex flex-col h-full cursor-pointer ${isDarkMode ? "bg-gray-800" : "bg-white"}`} onClick={() => onOpenModal(news)} role="article" aria-labelledby={`news-title-${news.id}`} > <div className="relative"> <img src={news.image || PLACEHOLDER_IMAGE} alt={`Imagem para: ${news.title}`} className="w-full h-48 object-cover sm:h-56 md:h-64" loading="lazy" onError={(e) => e.target.src = PLACEHOLDER_IMAGE} /> {news.category && ( <span className={`absolute top-2 left-2 text-white text-xs font-medium px-2 py-1 rounded-lg shadow ${isDarkMode ? "bg-blue-600" : "bg-blue-500"}`}> {news.category} </span> )} </div> <div className="p-5 flex flex-col flex-grow"> <div className="flex justify-between items-center mb-2 text-xs"> <p className={`font-medium ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>{news.source || "Fonte Desconhecida"}</p> {news.date && <p className={`${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{news.date}</p>} </div> <h3 id={`news-title-${news.id}`} className={`text-lg font-semibold line-clamp-3 mb-2 flex-grow ${isDarkMode ? "text-white" : "text-gray-900"}`}>{news.title || "Título Indisponível"}</h3> {news.summary && <p className={`text-sm line-clamp-2 mt-1 ${isDarkMode ? "text-gray-300" : "text-gray-600"}`}>{news.summary}</p>} <div className={`flex justify-between items-center mt-4 pt-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-200'}`}> <button onClick={(e) => { e.stopPropagation(); toggleFavorite(news.id); }} title={isFavorited ? "Remover dos Favoritos" : "Adicionar aos Favoritos"} className={`flex items-center p-2 rounded-full transition-colors duration-200 ${ isFavorited ? (isDarkMode ? "text-red-500 hover:bg-red-900 hover:bg-opacity-20" : "text-red-600 hover:bg-red-100") : (isDarkMode ? "text-gray-400 hover:text-red-400 hover:bg-gray-700" : "text-gray-600 hover:text-red-600 hover:bg-gray-200") }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={isFavorited ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={isFavorited ? 1 : 2}> <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /> </svg> </button> <button onClick={handleSpeakClick} title={isCurrentlySpeaking ? "Parar Leitura" : "Ouvir Título"} className={`flex items-center p-2 rounded-full transition-colors duration-200 ${ isCurrentlySpeaking ? (isDarkMode ? "text-yellow-400 bg-yellow-900 bg-opacity-30" : "text-yellow-600 bg-yellow-100") : (isDarkMode ? "text-gray-400 hover:text-blue-400 hover:bg-gray-700" : "text-gray-600 hover:text-blue-600 hover:bg-gray-200") }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"> {isCurrentlySpeaking ? ( <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /> ) : ( <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15z" /> )} </svg> </button> </div> </div> </div> );
+    };
 
-        const defaultAdmobSettings = {
-            appId: 'ca-app-pub-3940256099942544~3347511713', // Example App ID
-            bannerId: 'ca-app-pub-3940256099942544/9214589741',
-            fixedBannerId: 'ca-app-pub-3940256099942544/6300978111',
-            interstitialId: 'ca-app-pub-3940256099942544/1033173712',
-            rewardedId: 'ca-app-pub-3940256099942544/5224354917',
-            rewardedInterstitialId: 'ca-app-pub-3940256099942544/5354046379',
-            nativeId: 'ca-app-pub-3940256099942544/2247696110',
-            nativeVideoId: 'ca-app-pub-3940256099942544/1044960115'
-        };
-        
-        const defaultAppSettings = {
-            defaultTheme: 'system',
-            itemsPerPage: 12,
-            showAds: true,
-            adFrequency: 'medium' // 'low', 'medium', 'high'
-        };
+    // NewsModal (mantido)
+    const NewsModal = ({ news, onClose, isDarkMode, toggleFavorite, isFavorited, onOpenModal, currentlySpeakingId, setCurrentlySpeakingId }) => { /* ...código mantido... */
+         const isCurrentlySpeaking = news?.id === currentlySpeakingId; React.useEffect(() => { return () => { if (isCurrentlySpeaking) { speechManager.cancel(() => setCurrentlySpeakingId(null)); } }; }, [isCurrentlySpeaking, setCurrentlySpeakingId]); const handleSpeakClick = () => { if (!news?.content) return; const textToSpeak = `${news.title}. ${stripHtml(news.content)}`; speechManager.speak(textToSpeak, news.id, () => { setCurrentlySpeakingId(null); }); setCurrentlySpeakingId(speechManager.isSpeaking ? news.id : null); }; const handleShare = async () => { if (navigator.share && news) { try { await navigator.share({ title: news.title, text: news.summary || stripHtml(news.content).substring(0, 150) + '...', url: news.sourceLink || window.location.href, }); } catch (err) { console.error('Erro share:', err); navigator.clipboard.writeText(news.sourceLink || window.location.href).then(() => alert('Link copiado!')).catch(copyErr => console.error('Erro copy:', copyErr)); } } else if (news) { navigator.clipboard.writeText(news.sourceLink || window.location.href).then(() => alert('Link copiado!')).catch(err => console.error('Erro copy:', err)); } }; const generateTopNewsDetails = (topNews) => { return { ...topNews, id: `top-${topNews.id}`, date: new Date().toLocaleDateString("pt-BR"), summary: `Resumo: ${topNews.title.toLowerCase()}.`, content: `<p><strong>"${topNews.title}"</strong> - ${topNews.source} (${topNews.category}).</p><br/><p><em>(Conteúdo simulado)</em></p>`, sourceLink: `https://${topNews.source.toLowerCase().replace(/ /g, "")}.com` }; }; if (!news) return null; return ( <div className={`fixed inset-0 flex flex-col z-40 ${isDarkMode ? "bg-gray-900" : "bg-gray-100"}`}> <div className={`flex justify-between items-center p-4 border-b ${isDarkMode ? "border-gray-700 bg-gray-900" : "border-gray-300 bg-gray-100"} sticky top-0 z-10`}> <h2 className={`text-lg sm:text-xl font-bold line-clamp-1 ${isDarkMode ? "text-white" : "text-gray-800"}`}>{news.title}</h2> <button onClick={onClose} title="Fechar" className={`p-1 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-400 hover:text-white hover:bg-gray-700" : "text-gray-600 hover:text-gray-800 hover:bg-gray-200"}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /> </svg> </button> </div> <div className="p-5 overflow-y-auto flex-grow"> <div className="max-w-3xl mx-auto px-0 sm:px-4 lg:px-8"> <div className="flex flex-wrap justify-between items-center mb-4 gap-2 text-xs"> <div className="flex items-center space-x-2"> {news.category && ( <span className={`text-white font-medium px-2 py-1 rounded-lg shadow ${isDarkMode ? "bg-blue-600" : "bg-blue-500"}`}> {news.category} </span> )} <p className={`font-medium ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>{news.source || "G1"}</p> </div> {news.date && <p className={`${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{news.date}</p>} </div> <img src={news.image || PLACEHOLDER_IMAGE} alt={`Imagem para: ${news.title}`} className="w-full h-auto max-h-80 object-contain rounded-lg mb-5 shadow-md bg-gray-500" loading="lazy" onError={(e) => e.target.src = PLACEHOLDER_IMAGE} /> <div className={`prose prose-sm sm:prose-base max-w-none ${isDarkMode ? "prose-invert text-gray-300" : "text-gray-800"} [&_a]:text-blue-500 [&_a:hover]:underline`} dangerouslySetInnerHTML={{ __html: news.content || "<p>Conteúdo não disponível.</p>" }} /> <div className={`flex flex-wrap justify-between items-center gap-3 mt-6 pt-4 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}> <button onClick={() => toggleFavorite(news.id)} title={isFavorited ? "Remover Favorito" : "Adicionar Favorito"} className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border ${ isFavorited ? (isDarkMode ? "text-red-500 border-red-500 hover:bg-red-900 hover:bg-opacity-20" : "text-red-600 border-red-600 hover:bg-red-100") : (isDarkMode ? "text-gray-400 border-gray-600 hover:text-red-400 hover:border-red-400" : "text-gray-600 border-gray-400 hover:text-red-600 hover:border-red-600") }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill={isFavorited ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={isFavorited ? 1 : 2}> <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /> </svg> Favorito </button> <button onClick={handleSpeakClick} title={isCurrentlySpeaking ? "Parar Leitura" : "Ouvir Notícia"} className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border ${ isCurrentlySpeaking ? (isDarkMode ? "text-yellow-400 border-yellow-400 hover:bg-yellow-900 hover:bg-opacity-30" : "text-yellow-600 border-yellow-600 hover:bg-yellow-100") : (isDarkMode ? "text-gray-400 border-gray-600 hover:text-blue-400 hover:border-blue-400" : "text-gray-600 border-gray-400 hover:text-blue-600 hover:border-blue-600") }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"> {isCurrentlySpeaking ? ( <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /> ) : ( <path strokeLinecap="round" strokeLinejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707A1 1 0 0112 5v14a1 1 0 01-1.707.707L5.586 15z" /> )} </svg> {isCurrentlySpeaking ? 'Parar' : 'Ouvir'} </button> <button onClick={handleShare} title="Compartilhar" className={`flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-colors duration-200 border ${ isDarkMode ? "text-gray-400 border-gray-600 hover:text-blue-400 hover:border-blue-400" : "text-gray-600 border-gray-400 hover:text-blue-600 hover:border-blue-600" }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /> </svg> Compartilhar </button> <a href={news.sourceLink} target="_blank" rel="noopener noreferrer" className={`flex items-center justify-center text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${ isDarkMode ? "bg-blue-600 hover:bg-blue-700" : "bg-blue-500 hover:bg-blue-600" }`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /> </svg> Visitar fonte </a> </div> <div className={`mt-8 pt-6 border-t ${isDarkMode ? 'border-gray-700' : 'border-gray-300'}`}> <div className="mb-6"> <AdBanner position="modal" isDarkMode={isDarkMode} /> </div> <div> <h3 className={`text-lg font-semibold mb-4 ${isDarkMode ? "text-white" : "text-gray-800"}`}>Destaques do Dia</h3> <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"> {topTenNews.map((topNews) => ( <div key={topNews.id} className={`flex items-center p-3 rounded-lg shadow-md transition-all duration-300 hover:shadow-lg hover:-translate-y-1 cursor-pointer ${ isDarkMode ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200" }`} onClick={() => onOpenModal(generateTopNewsDetails(topNews))} > <img src={topNews.image} alt={topNews.title} className="w-16 h-16 object-cover rounded-lg mr-3 flex-shrink-0" loading="lazy" onError={(e) => e.target.src = PLACEHOLDER_IMAGE} /> <div className="flex-grow min-w-0"> <p className={`text-sm font-medium ${isDarkMode ? "text-gray-300" : "text-gray-700"} line-clamp-2`}>{topNews.title}</p> <p className={`text-xs ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>{topNews.source} • {topNews.category}</p> </div> <svg xmlns="http://www.w3.org/2000/svg" className={`h-5 w-5 ml-2 flex-shrink-0 ${isDarkMode ? "text-gray-400" : "text-gray-500"}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"> <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /> </svg> </div> ))} </div> </div> </div> </div> </div> </div> );
+    };
 
-        // --- Source Names Mapping ---
-         const sourceNames = {
-            g1: "G1",
-            uol: "UOL",
-            bbc: "BBC",
-            cnn: "CNN",
-            folha: "Folha", // Shorter name
-            estadao: "Estadão",
-            exame: "Exame",
-            valor: "Valor",
-            olhardigital: "Olhar Digital",
-            techcrunch: "TechCrunch",
-            ge: "Globo Esporte",
-            espn: "ESPN",
-            guardian: "The Guardian",
-            r7: "R7",
-            veja: "Veja",
-            lance: "Lance!"
-            // Add more as needed based on actual feed sources
-        };
-        
-        // --- DOM Elements ---
-        const themeToggle = document.getElementById('theme-toggle');
-        const refreshBtn = document.getElementById('refresh-btn');
-        const settingsBtn = document.getElementById('settings-btn');
-        const closeSettingsBtn = document.getElementById('close-settings-btn');
-        const settingsPanel = document.getElementById('settings-panel');
-        const filterBtn = document.getElementById('filter-btn');
-        const closeFilterBtn = document.getElementById('close-filter-btn');
-        const filterDropdown = document.getElementById('filter-dropdown');
-        const searchInput = document.getElementById('search-input');
-        const categoryBtns = document.querySelectorAll('.category-btn');
-        const mobileCategorySelect = document.getElementById('mobile-category-select');
-        // const mobileSourceSelect = document.getElementById('mobile-source-select'); // Source filter commented out for now
-        const applyFilterBtn = document.getElementById('apply-filter-btn');
-        const loadingSkeleton = document.getElementById('loading-skeleton');
-        const newsGrid = document.getElementById('news-grid');
-        const loadMoreContainer = document.getElementById('load-more-container');
-        const loadMoreBtn = document.getElementById('load-more-btn');
-        const noResults = document.getElementById('no-results');
-        const newsModal = document.getElementById('news-modal');
-        const closeModalBtn = document.getElementById('close-modal-btn');
-        const modalTitle = document.getElementById('modal-title');
-        const modalDate = document.getElementById('modal-date');
-        const modalImage = document.getElementById('modal-image');
-        const modalImageContainer = document.getElementById('modal-image-container');
-        const modalContent = document.getElementById('modal-content');
-        const modalCategory = document.getElementById('modal-category');
-        const modalSource = document.getElementById('modal-source');
-        const fullArticleBtn = document.getElementById('full-article-btn');
-        const speakBtn = document.getElementById('speak-btn');
-        const shareBtn = document.getElementById('share-btn');
-        const interstitialAd = document.getElementById('interstitial-ad');
-        const closeAdBtn = document.getElementById('close-ad-btn');
-        const forceCloseAdBtn = document.getElementById('force-close-ad-btn');
-        const adTimer = document.getElementById('ad-timer');
-        const toastContainer = document.getElementById('toast-container');
-        const simBannerId = document.getElementById('sim-banner-id');
-        
-        // Admin elements
-        const adminLoginSection = document.getElementById('admin-login-section');
-        const loginForm = document.getElementById('login-form');
-        const adminControls = document.getElementById('admin-controls');
-        const adminUsername = document.getElementById('admin-username');
-        const adminPassword = document.getElementById('admin-password');
-        const loginBtn = document.getElementById('login-btn');
-        const logoutBtn = document.getElementById('logout-btn');
-        
-        // RSS Management elements
-        const rssManagementSection = document.getElementById('rss-management-section');
-        const addFeedBtn = document.getElementById('add-feed-btn');
-        const addFeedForm = document.getElementById('add-feed-form');
-        const editingFeedId = document.getElementById('editing-feed-id');
-        const newFeedName = document.getElementById('new-feed-name');
-        const newFeedUrl = document.getElementById('new-feed-url');
-        const newFeedCategory = document.getElementById('new-feed-category');
-        const saveFeedBtn = document.getElementById('save-feed-btn');
-        const cancelFeedBtn = document.getElementById('cancel-feed-btn');
-        const rssFeedsList = document.getElementById('rss-feeds-list');
-        
-        // Fallback Images elements
-        const fallbackImagesSection = document.getElementById('fallback-images-section');
-        const globalFallbackImage = document.getElementById('global-fallback-image');
-        const saveGlobalFallback = document.getElementById('save-global-fallback');
-        const currentGlobalFallbackUrl = document.getElementById('current-global-fallback-url');
-        const categoryImagesList = document.getElementById('category-images-list');
-        const saveCategoryFallbacks = document.getElementById('save-category-fallbacks');
-        
-        // App Settings elements
-        const defaultThemeSelect = document.getElementById('default-theme');
-        const itemsPerPageSelect = document.getElementById('items-per-page');
-        const showAdsToggle = document.getElementById('show-ads-toggle');
-        const adFrequencySelect = document.getElementById('ad-frequency');
-        const saveAppSettings = document.getElementById('save-app-settings');
-        
-        // AdMob Settings elements
-        const admobSettingsSection = document.getElementById('admob-settings-section');
-        const admobAppIdInput = document.getElementById('admob-app-id');
-        const admobBannerIdInput = document.getElementById('admob-banner-id');
-        const admobFixedBannerIdInput = document.getElementById('admob-fixed-banner-id');
-        const admobInterstitialIdInput = document.getElementById('admob-interstitial-id');
-        const admobRewardedIdInput = document.getElementById('admob-rewarded-id');
-        const admobRewardedInterstitialIdInput = document.getElementById('admob-rewarded-interstitial-id');
-        const admobNativeIdInput = document.getElementById('admob-native-id');
-        const admobNativeVideoIdInput = document.getElementById('admob-native-video-id');
-        const saveAdmobSettings = document.getElementById('save-admob-settings');
+    // --- Componente Principal (App) ---
+    const App = () => {
+      const [selectedNews, setSelectedNews] = React.useState(null);
+      const [isDarkMode, setIsDarkMode] = React.useState(true);
+      const [activeCategory, setActiveCategory] = React.useState("Todas"); // Categoria inicial
+      const [searchQuery, setSearchQuery] = React.useState("");
+      const [sortBy, setSortBy] = React.useState("newest");
+      const [newsData, setNewsData] = React.useState([]); // Inicia vazio, preenchido pelo fetch
+      const [favoritedNews, setFavoritedNews] = React.useState(() => { /* ...código localStorage mantido... */
+         const saved = localStorage.getItem('favoritedNews'); return saved ? new Set(JSON.parse(saved)) : new Set();
+       });
+      const [allFetchedNews, setAllFetchedNews] = React.useState({}); // Cache
+      const [showFavoritesOnly, setShowFavoritesOnly] = React.useState(false);
+      const [displayedNewsCount, setDisplayedNewsCount] = React.useState(12);
+      const [isLoading, setIsLoading] = React.useState(true); // Começa true para fetch inicial
+      const [error, setError] = React.useState(null);
+      const [showScrollTop, setShowScrollTop] = React.useState(false);
+      const [showPremiumModal, setShowPremiumModal] = React.useState(false);
+      const [currentlySpeakingId, setCurrentlySpeakingId] = React.useState(null);
+      const observer = React.useRef();
 
-        // --- App State ---
-        let allNews = []; // Holds all fetched news (simulation)
-        let filteredNews = []; // News currently being displayed after filters
-        let currentCategory = 'all';
-        let currentSource = 'all'; // Source filtering currently disabled in UI
-        let currentSearch = '';
-        let displayedCount = 12; // Initial number of items to show
-        let itemsPerLoad = 12; // Number of items to load with "Load More"
-        let clickCount = 0;
-        let adClickThreshold = 10; // Clicks needed to trigger interstitial
-        let speechSynthesis = window.speechSynthesis;
-        let utterance = null;
-        let isAdmin = false;
-        let rssFeeds = [];
-        let categoryFallbackImages = {};
-        let appSettings = {};
-        let admobSettings = {};
-        let interstitialTimer = null;
-        let newsItemToOpenAfterAd = null;
+      // Efeito para tema e salvar favoritos (mantido)
+      React.useEffect(() => { /* ...código mantido... */
+        speechManager.loadVoices(); const bodyClassList = document.body.classList; if (isDarkMode) { bodyClassList.add("bg-gray-900", "text-white"); bodyClassList.remove("bg-gray-100", "text-gray-800"); } else { bodyClassList.add("bg-gray-100", "text-gray-800"); bodyClassList.remove("bg-gray-900", "text-white"); } localStorage.setItem('favoritedNews', JSON.stringify(Array.from(favoritedNews)));
+       }, [isDarkMode, favoritedNews]);
 
-        // --- Initialization ---
-        function init() {
-            loadSettings();
-            loadRssFeeds();
-            loadFallbackImages();
-            loadAdmobSettings(); // Load AdMob settings
+      // Fetch e Parse RSS com NOVO Proxy
+      const fetchAndParseRss = async (category) => {
+        speechManager.cancel(() => setCurrentlySpeakingId(null));
 
-            itemsPerLoad = parseInt(appSettings.itemsPerPage) || 12;
-            displayedCount = itemsPerLoad;
-            updateAdClickThreshold(); // Set threshold based on frequency
-
-            // Load news (replace with actual API call)
-            loadNews();
-            
-            setupEventListeners();
-            checkThemePreference();
-            updateUIBasedOnSettings();
-            updateSimulatedAdIds();
+        if (category === "Favoritos") {
+          setActiveCategory("Favoritos");
+          setShowFavoritesOnly(true);
+          setIsLoading(false); // Favoritos são carregados do cache, não busca
+          setError(null);
+          const favoriteItems = Object.values(allFetchedNews).flat().filter(news => favoritedNews.has(news.id)).filter((news, index, self) => index === self.findIndex(n => n.id === news.id));
+          setNewsData(favoriteItems);
+          setDisplayedNewsCount(favoriteItems.length);
+          return;
         }
 
-        // --- Data Loading & Saving (localStorage) ---
-        function loadSettings() {
-            try {
-                const savedSettings = localStorage.getItem('newsFlowSettings');
-                appSettings = savedSettings ? JSON.parse(savedSettings) : structuredClone(defaultAppSettings);
-            } catch (e) {
-                console.error("Error loading app settings:", e);
-                appSettings = structuredClone(defaultAppSettings);
-            }
+        setShowFavoritesOnly(false);
+        setActiveCategory(category);
+        setIsLoading(true);
+        setError(null);
+        setNewsData([]); // Limpa antes da nova busca
+        setDisplayedNewsCount(12);
+
+        const feedUrl = rssFeeds[category];
+        if (!feedUrl) {
+          setError(`Feed RSS para "${category}" não configurado.`);
+          setIsLoading(false);
+          return;
         }
 
-        function saveAppSettingsToStorage() {
-            try {
-                localStorage.setItem('newsFlowSettings', JSON.stringify(appSettings));
-            } catch (e) {
-                console.error("Error saving app settings:", e);
-                 showToast('Erro ao salvar configurações gerais', 'error');
-            }
-        }
+        // --- USA O NOVO PROXY ---
+        const urlToFetch = CORS_PROXY + encodeURIComponent(feedUrl); // encodeURIComponent é importante para corsproxy.io
+        // const urlToFetch = CORS_PROXY + feedUrl; // Se usar allorigins
+        console.log(`Fetching RSS from: ${urlToFetch} for category: ${category}`);
 
-        function loadRssFeeds() {
+        try {
+          const response = await fetch(urlToFetch, {
+              // Adicionar cabeçalhos pode ajudar com alguns proxies, mas não é garantia
+              // headers: { 'X-Requested-With': 'XMLHttpRequest' }
+          });
+          if (!response.ok) {
+            // Tenta dar uma mensagem de erro mais útil
+             let errorDetail = `status: ${response.status}`;
              try {
-                const savedFeeds = localStorage.getItem('newsFlowRssFeeds');
-                rssFeeds = savedFeeds ? JSON.parse(savedFeeds) : structuredClone(defaultRssFeeds);
-            } catch (e) {
-                console.error("Error loading RSS feeds:", e);
-                rssFeeds = structuredClone(defaultRssFeeds);
-                 showToast('Erro ao carregar feeds RSS', 'error');
-            }
-        }
+                 const errorText = await response.text();
+                 // Verifica se a resposta do proxy indica erro específico
+                 if (errorText.includes("Missing required parameter")) errorDetail += " (URL alvo faltando no proxy?)"
+                 else if (errorText.includes("rate limited")) errorDetail += " (Proxy sobrecarregado, tente depois)"
+                 else errorDetail += ` - ${errorText.substring(0,100)}...` // Mostra início da resposta
+             } catch {}
 
-        function saveRssFeeds() {
-             try {
-                localStorage.setItem('newsFlowRssFeeds', JSON.stringify(rssFeeds));
-            } catch (e) {
-                console.error("Error saving RSS feeds:", e);
-                 showToast('Erro ao salvar feeds RSS', 'error');
-            }
-        }
-
-        function loadFallbackImages() {
-            try {
-                const savedImages = localStorage.getItem('newsFlowFallbackImages');
-                categoryFallbackImages = savedImages ? JSON.parse(savedImages) : structuredClone(defaultCategoryFallbackImages);
-            } catch (e) {
-                console.error("Error loading fallback images:", e);
-                categoryFallbackImages = structuredClone(defaultCategoryFallbackImages);
-                 showToast('Erro ao carregar imagens padrão', 'error');
-            }
-            globalFallbackImage.value = categoryFallbackImages.global || '';
-            currentGlobalFallbackUrl.textContent = categoryFallbackImages.global || 'Nenhuma definida';
-        }
-
-        function saveFallbackImages() {
-            try {
-                localStorage.setItem('newsFlowFallbackImages', JSON.stringify(categoryFallbackImages));
-            } catch (e) {
-                console.error("Error saving fallback images:", e);
-                 showToast('Erro ao salvar imagens padrão', 'error');
-            }
-        }
-        
-        function loadAdmobSettings() {
-             try {
-                const savedAdmob = localStorage.getItem('newsFlowAdmobSettings');
-                admobSettings = savedAdmob ? JSON.parse(savedAdmob) : structuredClone(defaultAdmobSettings);
-            } catch (e) {
-                console.error("Error loading AdMob settings:", e);
-                admobSettings = structuredClone(defaultAdmobSettings);
-                showToast('Erro ao carregar configurações AdMob', 'error');
-            }
-        }
-
-        function saveAdmobSettingsToStorage() {
-            try {
-                localStorage.setItem('newsFlowAdmobSettings', JSON.stringify(admobSettings));
-            } catch (e) {
-                console.error("Error saving AdMob settings:", e);
-                showToast('Erro ao salvar configurações AdMob', 'error');
-            }
-        }
-
-        // --- Core App Logic ---
-        function loadNews() {
-            console.log("Loading news...");
-            loadingSkeleton.classList.remove('hidden');
-            newsGrid.classList.add('hidden');
-            noResults.classList.add('hidden');
-            
-            // --- SIMULATION ---
-            // Replace this with actual RSS fetching from backend (Supabase Functions)
-            // The backend should fetch from active feeds, parse, deduplicate, sort, and return news items.
-            setTimeout(() => {
-                allNews = structuredClone(sampleNews).sort((a, b) => new Date(b.date) - new Date(a.date)); // Sort by date descending
-                filterNews(); // Apply initial filters
-                
-                loadingSkeleton.classList.add('hidden');
-                newsGrid.classList.remove('hidden');
-                
-                updateLoadMoreButton();
-                console.log("News loaded (simulated).");
-            }, 1000); 
-        }
-
-        function renderNews() {
-            newsGrid.innerHTML = '';
-            const newsToDisplay = filteredNews.slice(0, displayedCount);
-            
-            if (newsToDisplay.length === 0) {
-                noResults.classList.remove('hidden');
-                newsGrid.classList.add('hidden');
-                return;
-            }
-            
-            noResults.classList.add('hidden');
-            newsGrid.classList.remove('hidden');
-            
-            let newsIndex = 0;
-            newsToDisplay.forEach((news) => {
-                 // Insert ad card based on settings (e.g., every 7 news items)
-                 // AdMob Native Ads integration would replace this.
-                 if (appSettings.showAds && newsIndex > 0 && newsIndex % 7 === 0) {
-                    newsGrid.appendChild(createAdCard());
-                }
-                
-                newsGrid.appendChild(createNewsCard(news));
-                newsIndex++;
-            });
-            
-            updateLoadMoreButton();
-        }
-
-        function createNewsCard(news) {
-            const card = document.createElement('div');
-            card.className = 'bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden transition-all duration-300 card-hover hover:shadow-lg fade-in cursor-pointer';
-            card.dataset.id = news.id; // Use a unique ID from the actual news item
-            
-            const date = new Date(news.date);
-            const formattedDate = date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
-            
-            const imageUrl = news.image || categoryFallbackImages[news.category] || categoryFallbackImages.global;
-            const sourceDisplayName = sourceNames[news.source?.toLowerCase()] || news.source || 'Desconhecida';
-            
-            card.innerHTML = `
-                <div class="h-48 overflow-hidden relative">
-                    <img src="${imageUrl}" alt="${news.title}" loading="lazy" class="w-full h-full object-cover" onerror="this.onerror=null; this.src='${categoryFallbackImages.global}';">
-                     <span class="absolute top-2 left-2 inline-block px-2 py-1 text-xs font-semibold rounded-full ${getCategoryColorClass(news.category)} shadow-sm">${formatCategoryName(news.category)}</span>
-                </div>
-                <div class="p-4 flex flex-col justify-between" style="min-height: 160px;"> 
-                    <div>
-                        <h3 class="font-bold text-lg mb-2 line-clamp-2" title="${news.title}">${news.title}</h3>
-                        <p class="text-gray-600 dark:text-gray-300 text-sm mb-3 line-clamp-3">${news.description}</p>
-                    </div>
-                    <div class="flex justify-between items-center text-xs text-gray-500 dark:text-gray-400 mt-auto pt-2 border-t border-gray-100 dark:border-gray-700">
-                        <span><i class="fas fa-clock mr-1"></i> ${formattedDate}</span>
-                        <span class="font-medium"><i class="fas fa-globe-americas mr-1"></i> ${sourceDisplayName}</span>
-                    </div>
-                </div>
-            `;
-            
-            card.addEventListener('click', () => handleNewsCardClick(news));
-            
-            return card;
-        }
-        
-         function createAdCard() {
-            // --- SIMULATION ---
-            // This should be replaced by Google AdMob Native Ad SDK integration
-            const adCard = document.createElement('div');
-            adCard.className = 'bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden fade-in border border-dashed border-gray-300 dark:border-gray-600';
-            
-            adCard.innerHTML = `
-                <div class="p-4">
-                    <div class="flex items-center mb-2">
-                        <span class="inline-block px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300">Publicidade</span>
-                    </div>
-                    <div class="h-32 bg-gray-100 dark:bg-gray-700 rounded flex items-center justify-center mb-3">
-                        <p class="text-gray-500 dark:text-gray-400 text-sm">Anúncio Nativo (AdMob ID: <span class="font-mono text-xs">${admobSettings.nativeId || 'N/A'}</span>)</p>
-                    </div>
-                    <h3 class="font-semibold text-md mb-1">Conteúdo Patrocinado</h3>
-                    <p class="text-gray-600 dark:text-gray-300 text-xs">Seu clique ajuda a manter este serviço gratuito.</p>
-                </div>
-            `;
-            return adCard;
-        }
-
-        function filterNews() {
-            console.log(`Filtering: Category='${currentCategory}', Search='${currentSearch}'`);
-            filteredNews = allNews.filter(news => {
-                const categoryMatch = currentCategory === 'all' || news.category === currentCategory;
-                const searchMatch = !currentSearch || 
-                                    news.title.toLowerCase().includes(currentSearch) || 
-                                    news.description.toLowerCase().includes(currentSearch);
-                // Add source filter here if implemented
-                return categoryMatch && searchMatch;
-            });
-            
-            // Reset display count and render
-            displayedCount = itemsPerLoad; 
-            renderNews();
-        }
-
-        function updateLoadMoreButton() {
-            if (filteredNews.length > displayedCount) {
-                loadMoreContainer.classList.remove('hidden');
-            } else {
-                loadMoreContainer.classList.add('hidden');
-            }
-        }
-        
-        function handleNewsCardClick(news) {
-             incrementClickCount();
-            
-            if (appSettings.showAds && clickCount >= adClickThreshold) {
-                console.log("Ad threshold reached. Showing interstitial.");
-                newsItemToOpenAfterAd = news; // Store the news item
-                showInterstitialAd();
-                clickCount = 0; // Reset counter after showing ad
-            } else {
-                 console.log("Opening modal directly.");
-                openNewsModal(news);
-            }
-        }
-
-        function openNewsModal(news) {
-             if (!news) {
-                console.error("Attempted to open modal with invalid news data.");
-                return;
-            }
-            console.log("Opening modal for:", news.title);
-            
-            const date = new Date(news.date);
-            const formattedDate = date.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-            const imageUrl = news.image || categoryFallbackImages[news.category] || categoryFallbackImages.global;
-             const sourceDisplayName = sourceNames[news.source?.toLowerCase()] || news.source || 'Desconhecida';
-
-            modalTitle.textContent = news.title;
-            modalDate.textContent = `Publicado em ${formattedDate}`;
-            modalImage.src = imageUrl;
-            modalImage.alt = news.title;
-            modalImage.onerror = () => { modalImage.src = categoryFallbackImages.global; }; // Fallback for modal image too
-            modalContent.innerHTML = `<p>${news.description}</p>`; // Use description, actual RSS might have more content
-            modalCategory.textContent = formatCategoryName(news.category);
-            modalCategory.className = `inline-block px-2 py-1 text-xs font-medium rounded-full ${getCategoryColorClass(news.category)}`;
-            modalSource.textContent = sourceDisplayName;
-            fullArticleBtn.href = news.url;
-            
-            // Store data for speak/share
-            speakBtn.dataset.text = `${news.title}. ${news.description}`;
-            shareBtn.dataset.url = news.url;
-            shareBtn.dataset.title = news.title;
-
-            newsModal.classList.remove('hidden');
-            document.body.style.overflow = 'hidden'; // Prevent background scroll
-        }
-
-        function closeNewsModal() {
-            newsModal.classList.add('hidden');
-            document.body.style.overflow = 'auto';
-            if (speechSynthesis.speaking) {
-                speechSynthesis.cancel();
-            }
-             // Clear potentially stored data
-            speakBtn.dataset.text = "";
-            shareBtn.dataset.url = "";
-            shareBtn.dataset.title = "";
-        }
-        
-        function showInterstitialAd() {
-            // --- SIMULATION ---
-            // Replace with AdMob Interstitial SDK call
-             if (!appSettings.showAds) return; // Don't show if disabled
-            
-            console.log("Showing Interstitial Ad (Simulation)");
-            interstitialAd.classList.remove('hidden');
-            document.body.style.overflow = 'hidden'; // Prevent background scroll
-
-            let seconds = 5;
-            adTimer.textContent = seconds;
-            closeAdBtn.disabled = true;
-            closeAdBtn.classList.add('opacity-50', 'cursor-not-allowed');
-
-            // Clear any previous timer
-            if (interstitialTimer) clearInterval(interstitialTimer);
-
-            interstitialTimer = setInterval(() => {
-                seconds--;
-                adTimer.textContent = seconds;
-                if (seconds <= 0) {
-                    clearInterval(interstitialTimer);
-                    interstitialTimer = null;
-                    closeAdBtn.disabled = false;
-                    closeAdBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-                    closeAdBtn.textContent = "Fechar Anúncio";
-                }
-            }, 1000);
-        }
-
-        function closeInterstitialAd(openStoredNews = true) {
-            console.log("Closing Interstitial Ad");
-            interstitialAd.classList.add('hidden');
-             if (interstitialTimer) {
-                clearInterval(interstitialTimer);
-                 interstitialTimer = null;
-            }
-            
-             // Only restore body scroll if the news modal isn't immediately opening
-            if (!openStoredNews || !newsItemToOpenAfterAd) {
-                 document.body.style.overflow = 'auto';
-            }
-
-             // Open the news item that triggered the ad, if requested and available
-            if (openStoredNews && newsItemToOpenAfterAd) {
-                console.log("Opening stored news item after ad close.");
-                openNewsModal(newsItemToOpenAfterAd);
-            }
-             newsItemToOpenAfterAd = null; // Clear the stored item
-             
-             // Reset button state for next time
-             closeAdBtn.textContent = `Fechar Anúncio (${5}s)`; 
-        }
-
-        function incrementClickCount() {
-            clickCount++;
-            console.log("Click count:", clickCount);
-        }
-        
-        function updateAdClickThreshold() {
-             switch (appSettings.adFrequency) {
-                case 'low': adClickThreshold = 15; break;
-                case 'high': adClickThreshold = 5; break;
-                case 'medium': 
-                default: adClickThreshold = 10; break;
-            }
-            console.log("Ad frequency set to:", appSettings.adFrequency, "Threshold:", adClickThreshold);
-        }
-
-        // --- UI Helpers ---
-        function formatCategoryName(category) {
-            if (!category) return 'Geral';
-            const names = {
-                brasil: 'Brasil', mundo: 'Mundo', politica: 'Política', economia: 'Economia',
-                tecnologia: 'Tecnologia', esportes: 'Esportes', saude: 'Saúde',
-                entretenimento: 'Entretenimento', ciencia: 'Ciência'
-            };
-            return names[category.toLowerCase()] || category.charAt(0).toUpperCase() + category.slice(1);
-        }
-
-        function getCategoryColorClass(category) {
-             if (!category) return 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300';
-             const catLower = category.toLowerCase();
-             if (catLower === 'brasil') return 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300';
-             if (catLower === 'mundo') return 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300';
-             if (catLower === 'politica') return 'bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300';
-             if (catLower === 'economia') return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300';
-             if (catLower === 'tecnologia') return 'bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-300';
-             if (catLower === 'esportes') return 'bg-orange-100 dark:bg-orange-900 text-orange-700 dark:text-orange-300';
-             if (catLower === 'saude') return 'bg-pink-100 dark:bg-pink-900 text-pink-700 dark:text-pink-300';
-             if (catLower === 'entretenimento') return 'bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300';
-             if (catLower === 'ciencia') return 'bg-cyan-100 dark:bg-cyan-900 text-cyan-700 dark:text-cyan-300';
-             return 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300';
-        }
-
-        function checkThemePreference() {
-            const savedTheme = localStorage.getItem('theme') || appSettings.defaultTheme || 'system';
-            applyTheme(savedTheme);
-        }
-
-        function applyTheme(theme) {
-             if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-        }
-        
-         function updateUIBasedOnSettings() {
-            // Update settings panel inputs to reflect current settings
-            defaultThemeSelect.value = appSettings.defaultTheme;
-            itemsPerPageSelect.value = appSettings.itemsPerPage.toString();
-            showAdsToggle.checked = appSettings.showAds;
-            adFrequencySelect.value = appSettings.adFrequency;
-            
-            // Update AdMob inputs
-            admobAppIdInput.value = admobSettings.appId || '';
-            admobBannerIdInput.value = admobSettings.bannerId || '';
-            admobFixedBannerIdInput.value = admobSettings.fixedBannerId || '';
-            admobInterstitialIdInput.value = admobSettings.interstitialId || '';
-            admobRewardedIdInput.value = admobSettings.rewardedId || '';
-            admobRewardedInterstitialIdInput.value = admobSettings.rewardedInterstitialId || '';
-            admobNativeIdInput.value = admobSettings.nativeId || '';
-            admobNativeVideoIdInput.value = admobSettings.nativeVideoId || '';
-        }
-
-        function updateSimulatedAdIds() {
-             // Update placeholder IDs in the UI simulations
-            simBannerId.textContent = admobSettings.bannerId || 'N/A';
-            // Update other placeholders if needed
-        }
-
-        function showToast(message, type = 'info') {
-            const toast = document.createElement('div');
-            toast.className = `toast toast-${type}`;
-            toast.textContent = message;
-            
-            toastContainer.appendChild(toast);
-            
-            // Remove toast after animation finishes
-            setTimeout(() => {
-                 if (toast.parentNode) {
-                    toast.parentNode.removeChild(toast);
-                }
-            }, 3000); // Match CSS animation duration + display time
-        }
-
-        // --- Settings Panel Logic ---
-        function openSettingsPanel() {
-            settingsPanel.classList.remove('hidden');
-            settingsPanel.querySelector('div').classList.remove('translate-x-full');
-            // Load current settings into the form fields when opening
-            updateUIBasedOnSettings();
-            if (isAdmin) {
-                loadRssFeedsList();
-                loadCategoryImagesList();
-            }
-        }
-
-        function closeSettingsPanel() {
-            settingsPanel.querySelector('div').classList.add('translate-x-full');
-            setTimeout(() => settingsPanel.classList.add('hidden'), 300);
-        }
-
-        function openFilterDropdown() {
-            // Pre-select current category
-            mobileCategorySelect.value = currentCategory;
-            // Pre-select current source if implemented
-            // mobileSourceSelect.value = currentSource; 
-            filterDropdown.classList.remove('hidden');
-            filterDropdown.querySelector('div').classList.remove('translate-y-full');
-        }
-
-        function closeFilterDropdown() {
-            filterDropdown.querySelector('div').classList.add('translate-y-full');
-            setTimeout(() => filterDropdown.classList.add('hidden'), 300);
-        }
-
-        function applyMobileFilters() {
-            const newCategory = mobileCategorySelect.value;
-            // const newSource = mobileSourceSelect.value; // Uncomment if source filtering is added
-            
-            if (newCategory !== currentCategory /* || newSource !== currentSource */) {
-                currentCategory = newCategory;
-                // currentSource = newSource;
-                
-                // Update desktop category buttons to match
-                categoryBtns.forEach(btn => {
-                    if (btn.dataset.category === currentCategory) {
-                        btn.classList.add('bg-primary-100', 'dark:bg-primary-900', 'text-primary-700', 'dark:text-primary-300');
-                        btn.classList.remove('bg-gray-100', 'dark:bg-gray-700');
-                    } else {
-                        btn.classList.remove('bg-primary-100', 'dark:bg-primary-900', 'text-primary-700', 'dark:text-primary-300');
-                        btn.classList.add('bg-gray-100', 'dark:bg-gray-700');
-                    }
-                });
-                
-                filterNews();
-            }
-            closeFilterDropdown();
-        }
-        
-        function handleSaveAppSettings() {
-            appSettings.defaultTheme = defaultThemeSelect.value;
-            appSettings.itemsPerPage = parseInt(itemsPerPageSelect.value) || 12;
-            appSettings.showAds = showAdsToggle.checked;
-            appSettings.adFrequency = adFrequencySelect.value;
-            
-            itemsPerLoad = appSettings.itemsPerPage; // Update items per load
-            updateAdClickThreshold(); // Update ad frequency threshold
-            
-            saveAppSettingsToStorage();
-            checkThemePreference(); // Apply theme immediately if changed
-            showToast('Configurações gerais salvas!', 'success');
-            
-            // Optionally re-render if items per page changed drastically
-            if (displayedCount !== appSettings.itemsPerPage) {
-                displayedCount = appSettings.itemsPerPage;
-                renderNews();
-            }
-        }
-
-        function handleSaveAdmobSettings() {
-            admobSettings.appId = admobAppIdInput.value.trim();
-            admobSettings.bannerId = admobBannerIdInput.value.trim();
-            admobSettings.fixedBannerId = admobFixedBannerIdInput.value.trim();
-            admobSettings.interstitialId = admobInterstitialIdInput.value.trim();
-            admobSettings.rewardedId = admobRewardedIdInput.value.trim();
-            admobSettings.rewardedInterstitialId = admobRewardedInterstitialIdInput.value.trim();
-            admobSettings.nativeId = admobNativeIdInput.value.trim();
-            admobSettings.nativeVideoId = admobNativeVideoIdInput.value.trim();
-            
-            saveAdmobSettingsToStorage();
-            updateSimulatedAdIds();
-            showToast('Configurações AdMob salvas!', 'success');
-        }
-        
-        function handleSaveGlobalFallback() {
-             const url = globalFallbackImage.value.trim();
-            categoryFallbackImages.global = url || defaultCategoryFallbackImages.global; // Use default if empty
-            saveFallbackImages();
-            globalFallbackImage.value = categoryFallbackImages.global; // Update input field
-            currentGlobalFallbackUrl.textContent = categoryFallbackImages.global;
-             showToast('Imagem global padrão salva!', 'success');
-             // Re-render might be needed if many images were using the old global fallback
-             renderNews(); 
-        }
-        
-        function handleSaveCategoryFallbacks() {
-            const inputs = categoryImagesList.querySelectorAll('input[data-category]');
-            let changed = false;
-            inputs.forEach(input => {
-                const category = input.dataset.category;
-                const url = input.value.trim();
-                 if (url && categoryFallbackImages[category] !== url) {
-                     categoryFallbackImages[category] = url;
-                    changed = true;
-                } else if (!url && categoryFallbackImages[category]) {
-                    // If cleared, remove the specific category fallback (will use global)
-                    delete categoryFallbackImages[category];
-                    changed = true;
-                }
-            });
-            
-            if(changed) {
-                saveFallbackImages();
-                showToast('Imagens de categoria salvas!', 'success');
-                 renderNews(); // Re-render as image sources might have changed
-            } else {
-                showToast('Nenhuma alteração nas imagens de categoria.', 'info');
-            }
-        }
-
-        // --- Admin Specific Logic ---
-        function adminLogin() {
-            // !!! WARNING: INSECURE - FOR DEMO ONLY !!!
-            // Replace with a proper backend authentication system (e.g., Supabase Auth)
-            const username = adminUsername.value.trim();
-            const password = adminPassword.value.trim();
-            
-            if (username === 'admin' && password === 'admin123') {
-                isAdmin = true;
-                loginForm.classList.add('hidden');
-                adminControls.classList.remove('hidden');
-                rssManagementSection.classList.remove('hidden');
-                fallbackImagesSection.classList.remove('hidden');
-                admobSettingsSection.classList.remove('hidden');
-                
-                loadRssFeedsList();
-                loadCategoryImagesList();
-                adminPassword.value = ''; // Clear password field
-                showToast('Login administrativo bem-sucedido!', 'success');
-            } else {
-                isAdmin = false; // Ensure state is correct on failure
-                showToast('Usuário ou senha inválidos', 'error');
-            }
-        }
-
-        function adminLogout() {
-            isAdmin = false;
-            loginForm.classList.remove('hidden');
-            adminControls.classList.add('hidden');
-            rssManagementSection.classList.add('hidden');
-            fallbackImagesSection.classList.add('hidden');
-            admobSettingsSection.classList.add('hidden');
-            
-            adminUsername.value = '';
-            adminPassword.value = '';
-            showToast('Logout realizado', 'success');
-        }
-
-        function loadRssFeedsList() {
-             if (!isAdmin) return;
-            rssFeedsList.innerHTML = ''; // Clear previous list
-            
-            if (rssFeeds.length === 0) {
-                rssFeedsList.innerHTML = `<div class="p-4 text-center text-gray-500">Nenhum feed RSS cadastrado.</div>`;
-                return;
-            }
-
-            const listContainer = document.createElement('div');
-            listContainer.className = 'divide-y divide-gray-200 dark:divide-gray-700';
-
-            rssFeeds.forEach(feed => {
-                const item = document.createElement('div');
-                item.className = 'p-3 flex items-center justify-between space-x-2';
-                item.dataset.id = feed.id;
-
-                item.innerHTML = `
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center justify-between">
-                             <h4 class="font-medium truncate flex items-center ${feed.active ? '' : 'text-gray-400 dark:text-gray-500 line-through'}">
-                                 <i class="fas fa-circle text-xs mr-2 ${feed.active ? 'text-green-500' : 'text-gray-400'}"></i>
-                                ${feed.name}
-                             </h4>
-                             <span class="inline-block px-2 py-0.5 ml-2 text-xs font-medium rounded-full ${getCategoryColorClass(feed.category)}">${formatCategoryName(feed.category)}</span>
-                        </div>
-                        <p class="text-xs text-gray-500 dark:text-gray-400 truncate mt-1">${feed.url}</p>
-                    </div>
-                    <div class="flex space-x-1 text-xs">
-                        <button class="edit-feed-btn p-1 text-blue-600 hover:text-blue-800" aria-label="Editar feed ${feed.name}"> <i class="fas fa-edit"></i> </button>
-                        <button class="toggle-feed-btn p-1 ${feed.active ? 'text-yellow-600 hover:text-yellow-800' : 'text-green-600 hover:text-green-800'}" aria-label="${feed.active ? 'Desativar' : 'Ativar'} feed ${feed.name}"> <i class="fas ${feed.active ? 'fa-toggle-off' : 'fa-toggle-on'}"></i> </button>
-                        <button class="delete-feed-btn p-1 text-red-600 hover:text-red-800" aria-label="Excluir feed ${feed.name}"> <i class="fas fa-trash-alt"></i> </button>
-                    </div>
-                `;
-                
-                 // Add event listeners for buttons within the loop
-                 item.querySelector('.edit-feed-btn').addEventListener('click', () => editFeed(feed.id));
-                 item.querySelector('.toggle-feed-btn').addEventListener('click', () => toggleFeed(feed.id));
-                 item.querySelector('.delete-feed-btn').addEventListener('click', () => deleteFeed(feed.id));
-
-                listContainer.appendChild(item);
-            });
-            rssFeedsList.appendChild(listContainer);
-        }
-
-        function loadCategoryImagesList() {
-            if (!isAdmin) return;
-             categoryImagesList.innerHTML = ''; // Clear previous
-            const categories = ['brasil', 'mundo', 'politica', 'economia', 'tecnologia', 'esportes', 'saude', 'entretenimento', 'ciencia']; // Ensure all are listed
-
-            categories.forEach(category => {
-                const div = document.createElement('div');
-                 div.className = 'flex items-center space-x-2';
-                div.innerHTML = `
-                    <label for="cat-img-${category}" class="w-28 text-sm font-medium text-right pr-2">${formatCategoryName(category)}:</label>
-                    <input type="url" id="cat-img-${category}" data-category="${category}" 
-                           placeholder="URL da imagem para ${formatCategoryName(category)}" 
-                           value="${categoryFallbackImages[category] || ''}"
-                           class="flex-1 p-1.5 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-sm">
-                `;
-                 categoryImagesList.appendChild(div);
-            });
-        }
-        
-        function showAddFeedForm(feedToEdit = null) {
-            if (feedToEdit) {
-                editingFeedId.value = feedToEdit.id;
-                newFeedName.value = feedToEdit.name;
-                newFeedUrl.value = feedToEdit.url;
-                newFeedCategory.value = feedToEdit.category;
-                saveFeedBtn.textContent = "Atualizar";
-            } else {
-                editingFeedId.value = '';
-                newFeedName.value = '';
-                newFeedUrl.value = '';
-                newFeedCategory.value = 'brasil'; // Default category
-                saveFeedBtn.textContent = "Salvar";
-            }
-            addFeedForm.classList.remove('hidden');
-        }
-        
-        function hideAddFeedForm() {
-             addFeedForm.classList.add('hidden');
-             editingFeedId.value = ''; // Clear editing state
-        }
-        
-        function handleSaveFeed() {
-            const id = editingFeedId.value ? parseInt(editingFeedId.value) : null;
-            const name = newFeedName.value.trim();
-            const url = newFeedUrl.value.trim();
-            const category = newFeedCategory.value;
-
-            if (!name || !url || !category) {
-                showToast("Preencha todos os campos do feed.", "error");
-                return;
-            }
-            
-            // Basic URL validation
-            try {
-                 new URL(url);
-            } catch (_) {
-                 showToast("URL do feed inválida.", "error");
-                return;
-            }
-
-            if (id) {
-                // Update existing feed
-                const index = rssFeeds.findIndex(f => f.id === id);
-                if (index > -1) {
-                    rssFeeds[index] = { ...rssFeeds[index], name, url, category };
-                     showToast('Feed atualizado com sucesso!', 'success');
-                }
-            } else {
-                // Add new feed
-                const newId = rssFeeds.length > 0 ? Math.max(...rssFeeds.map(f => f.id)) + 1 : 1;
-                rssFeeds.push({ id: newId, name, url, category, active: true });
-                 showToast('Feed adicionado com sucesso!', 'success');
-            }
-            
-            saveRssFeeds();
-            loadRssFeedsList(); // Refresh the list
-            hideAddFeedForm();
-             // TODO: Trigger a refresh of the news list if desired after adding/updating feeds
-             // loadNews(); // Potentially call this, maybe with a loading indicator
-        }
-        
-        function editFeed(id) {
-             const feed = rssFeeds.find(f => f.id === id);
-             if (feed) {
-                 showAddFeedForm(feed);
-                 // Scroll to the form if needed
-                 addFeedForm.scrollIntoView({ behavior: 'smooth' });
-            }
-        }
-        
-        function toggleFeed(id) {
-            const index = rssFeeds.findIndex(f => f.id === id);
-            if (index > -1) {
-                rssFeeds[index].active = !rssFeeds[index].active;
-                saveRssFeeds();
-                loadRssFeedsList(); // Refresh list to show toggle state
-                 showToast(`Feed ${rssFeeds[index].active ? 'ativado' : 'desativado'}.`, 'success');
-                 // TODO: Trigger news refresh if needed
-                 // loadNews();
-            }
-        }
-
-        function deleteFeed(id) {
-            const feed = rssFeeds.find(f => f.id === id);
-            if (feed && confirm(`Tem certeza que deseja excluir o feed "${feed.name}"?`)) {
-                rssFeeds = rssFeeds.filter(f => f.id !== id);
-                saveRssFeeds();
-                loadRssFeedsList(); // Refresh the list
-                 showToast('Feed excluído com sucesso!', 'success');
-                 // TODO: Trigger news refresh if needed
-                 // loadNews();
-            }
-        }
-
-        // --- Text-to-Speech & Share ---
-        function speakText(text) {
-             if (!text) return;
-            if (speechSynthesis.speaking) {
-                speechSynthesis.cancel(); // Stop previous speech
-                 speakBtn.innerHTML = '<i class="fas fa-volume-up mr-1"></i> Ouvir'; // Reset button text
-                return;
-            }
-            if (speechSynthesis.paused) {
-                speechSynthesis.resume();
-                speakBtn.innerHTML = '<i class="fas fa-pause mr-1"></i> Pausar';
-                return;
-            }
-
-            utterance = new SpeechSynthesisUtterance(text);
-            utterance.lang = 'pt-BR';
-             // Change button text during speech
-            utterance.onstart = () => {
-                 speakBtn.innerHTML = '<i class="fas fa-pause mr-1"></i> Pausar';
-             };
-            utterance.onpause = () => {
-                 speakBtn.innerHTML = '<i class="fas fa-play mr-1"></i> Retomar';
-            };
-             utterance.onresume = () => {
-                 speakBtn.innerHTML = '<i class="fas fa-pause mr-1"></i> Pausar';
-             };
-            utterance.onend = () => {
-                 speakBtn.innerHTML = '<i class="fas fa-volume-up mr-1"></i> Ouvir';
-                 utterance = null; // Clear utterance when finished
-            };
-            utterance.onerror = (event) => {
-                console.error('SpeechSynthesisUtterance.onerror', event);
-                 showToast('Erro ao tentar reproduzir áudio.', 'error');
-                 speakBtn.innerHTML = '<i class="fas fa-volume-up mr-1"></i> Ouvir';
-                 utterance = null;
+             throw new Error(`Erro HTTP! ${errorDetail}. O proxy CORS pode estar offline ou bloqueando a solicitação.`);
+          }
+          const xmlText = await response.text();
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(xmlText, "application/xml"); // Usar application/xml pode ser mais robusto
+          const parserError = xmlDoc.querySelector("parsererror");
+          if (parserError) {
+             // Verifica se o erro é por causa de HTML (comum com allorigins)
+             if (xmlText.trim().startsWith('<') && !xmlText.trim().startsWith('<?xml')) {
+                console.warn("Parece ser HTML em vez de XML. Proxy pode ter retornado página de erro.");
              }
-            
-            speechSynthesis.speak(utterance);
+             throw new Error(`Erro ao analisar XML de ${category}: ${parserError.textContent}`);
+          }
+
+          const items = xmlDoc.querySelectorAll("item");
+          if (items.length === 0 && !xmlDoc.querySelector("channel")) { // Checa se realmente não tem itens e nem estrutura de feed
+             throw new Error(`Nenhum item encontrado no feed de ${category}. Resposta pode estar vazia ou mal formatada.`);
+          }
+
+          console.log(`Found ${items.length} items in feed for ${category}`);
+          const parsedNews = [];
+          items.forEach((item, index) => {
+            const title = item.querySelector("title")?.textContent || "";
+            const link = item.querySelector("link")?.textContent || "";
+            const guidElement = item.querySelector("guid");
+            const guid = guidElement?.textContent || link || `rss-${category}-${Date.now()}-${index}`;
+            const pubDate = item.querySelector("pubDate")?.textContent || ""; // Guardar raw para ordenação
+            const description = item.querySelector("description")?.textContent || "";
+            let image = null;
+            const mediaContent = item.querySelector("media\\:content, content");
+            if (mediaContent) image = mediaContent.getAttribute("url");
+            else { const imgMatch = description.match(/<img src="([^"]+)"/); if (imgMatch?.[1]) image = imgMatch[1]; }
+
+            parsedNews.push({
+              id: guid, source: "G1", title: title, image: image,
+              date: formatDate(pubDate), // Data formatada para exibição
+              pubDateRaw: pubDate, // Data original para ordenação
+              summary: stripHtml(description).substring(0, 150) + (stripHtml(description).length > 150 ? '...' : ''),
+              content: description, sourceLink: link, category: category,
+            });
+          });
+
+          setNewsData(parsedNews);
+          setAllFetchedNews(prevCache => ({ ...prevCache, [category]: parsedNews }));
+
+        } catch (err) {
+          console.error("Falha ao buscar ou analisar RSS:", err);
+          setError(`Falha ao carregar ${category}. ${err.message}`);
+          setNewsData([]); // Limpa dados em caso de erro
+        } finally {
+          setIsLoading(false);
         }
+      };
 
-        async function shareNews(title, url) {
-            if (navigator.share) {
-                try {
-                    await navigator.share({
-                        title: title,
-                        text: `Confira esta notícia: ${title}`,
-                        url: url,
-                    });
-                    console.log('Notícia compartilhada com sucesso!');
-                } catch (err) {
-                    console.error('Erro ao compartilhar:', err);
-                     // Don't show error toast if user cancelled share
-                     if (err.name !== 'AbortError') {
-                        showToast('Erro ao compartilhar notícia.', 'error');
-                    }
-                }
-            } else {
-                // Fallback for browsers that don't support Web Share API
-                 try {
-                    await navigator.clipboard.writeText(url);
-                    showToast('Link da notícia copiado para a área de transferência!', 'success');
-                } catch (err) {
-                    console.error('Erro ao copiar link:', err);
-                    showToast('Não foi possível copiar o link.', 'error');
-                }
-            }
-        }
+      // Efeito inicial (busca "Todas")
+      React.useEffect(() => {
+        fetchAndParseRss("Todas");
+      }, []); // Roda só na montagem inicial
 
-        // --- Event Listeners Setup ---
-        function setupEventListeners() {
-            themeToggle.addEventListener('click', () => {
-                const currentTheme = document.documentElement.classList.contains('dark') ? 'dark' : 'light';
-                 const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-                 applyTheme(newTheme);
-                 localStorage.setItem('theme', newTheme); // Save explicit preference
-                 // Update app setting only if default is not 'system'
-                 if (appSettings.defaultTheme !== 'system') {
-                     appSettings.defaultTheme = newTheme;
-                     saveAppSettingsToStorage();
-                     defaultThemeSelect.value = newTheme; // Update dropdown in settings
-                 }
-            });
-            
-            refreshBtn.addEventListener('click', () => {
-                 showToast('Atualizando notícias...', 'info');
-                 loadNews(); // Reload news
-             });
+      // Funções toggle (mantidas)
+      const toggleDarkMode = () => setIsDarkMode(prev => !prev);
+      const toggleFavorite = (newsId) => { /* ...código mantido... */
+         setFavoritedNews(prev => { const newSet = new Set(prev); if (newSet.has(newsId)) newSet.delete(newsId); else newSet.add(newsId); return newSet; });
+      };
 
-            settingsBtn.addEventListener('click', openSettingsPanel);
-            closeSettingsBtn.addEventListener('click', closeSettingsPanel);
-            
-            filterBtn.addEventListener('click', openFilterDropdown);
-            closeFilterBtn.addEventListener('click', closeFilterDropdown);
-            applyFilterBtn.addEventListener('click', applyMobileFilters);
+      // Refresh (mantido)
+      const handleRefresh = () => { /* ...código mantido... */
+         console.log("Refreshing category:", activeCategory); setSearchQuery(""); setSortBy("newest"); fetchAndParseRss(activeCategory);
+      };
 
-            searchInput.addEventListener('input', (e) => {
-                currentSearch = e.target.value.toLowerCase().trim();
-                filterNews();
-            });
+      // Load More (mantido)
+       const loadMoreNews = () => { /* ...código mantido... */
+             if (showFavoritesOnly || displayedNewsCount >= filteredNews.length) return; setIsLoading(true); setTimeout(() => { const moreNewsToAdd = 12; setDisplayedNewsCount(prev => Math.min(prev + moreNewsToAdd, filteredNews.length)); setIsLoading(false); }, 300);
+        };
 
-            categoryBtns.forEach(btn => {
-                btn.addEventListener('click', () => {
-                    currentCategory = btn.dataset.category;
-                    categoryBtns.forEach(b => b.classList.remove('bg-primary-100', 'dark:bg-primary-900', 'text-primary-700', 'dark:text-primary-300'));
-                    categoryBtns.forEach(b => b.classList.add('bg-gray-100', 'dark:bg-gray-700'));
-                    btn.classList.add('bg-primary-100', 'dark:bg-primary-900', 'text-primary-700', 'dark:text-primary-300');
-                    btn.classList.remove('bg-gray-100', 'dark:bg-gray-700');
-                    filterNews();
-                });
-            });
+      // Filtro e Ordenação (ajustado para usar pubDateRaw)
+       const filteredNews = React.useMemo(() => {
+           let dataToFilter = showFavoritesOnly
+               ? Object.values(allFetchedNews).flat().filter(news => favoritedNews.has(news.id)).filter((news, index, self) => index === self.findIndex(n => n.id === news.id))
+               : newsData;
+           const searchedData = dataToFilter.filter(news => !searchQuery || news.title.toLowerCase().includes(searchQuery.toLowerCase()) || (news.summary && news.summary.toLowerCase().includes(searchQuery.toLowerCase())) );
+           return [...searchedData].sort((a, b) => {
+               const parseDate = (dateStr) => { try { return new Date(dateStr || 0); } catch { return new Date(0); } };
+               // Prioriza pubDateRaw para ordenação por data
+               if (sortBy === "newest") return parseDate(b.pubDateRaw || b.date) - parseDate(a.pubDateRaw || a.date);
+               if (sortBy === "oldest") return parseDate(a.pubDateRaw || a.date) - parseDate(b.pubDateRaw || b.date);
+               if (sortBy === "title-asc") return a.title.localeCompare(b.title);
+               if (sortBy === "title-desc") return b.title.localeCompare(a.title);
+               return 0;
+           });
+       }, [showFavoritesOnly ? favoritedNews : newsData, allFetchedNews, searchQuery, sortBy]); // Dependências atualizadas
 
-            loadMoreBtn.addEventListener('click', () => {
-                displayedCount += itemsPerLoad;
-                renderNews();
-            });
+      const newsToDisplay = filteredNews.slice(0, displayedNewsCount);
 
-            closeModalBtn.addEventListener('click', closeNewsModal);
-            // Close modal on overlay click
-             newsModal.addEventListener('click', (e) => {
-                if (e.target === newsModal || e.target.classList.contains('modal-overlay')) {
-                    closeNewsModal();
-                }
-            });
-            
-            // Interstitial Ad close buttons
-            closeAdBtn.addEventListener('click', () => closeInterstitialAd(true)); // Close and open news
-             forceCloseAdBtn.addEventListener('click', () => closeInterstitialAd(true)); // Also close and open news
+      // Scroll e AdCard (mantidos)
+      const lastNewsElementRef = React.useCallback(node => { /* ...código mantido... */
+             if (isLoading || showFavoritesOnly) return; if (observer.current) observer.current.disconnect(); observer.current = new IntersectionObserver(entries => { if (entries[0].isIntersecting && displayedNewsCount < filteredNews.length) { loadMoreNews(); } }, { threshold: 0.5 }); if (node) observer.current.observe(node);
+        }, [isLoading, showFavoritesOnly, displayedNewsCount, filteredNews.length]);
+      const handleScroll = () => setShowScrollTop(window.scrollY > 300);
+      const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+      React.useEffect(() => { window.addEventListener("scroll", handleScroll); return () => window.removeEventListener("scroll", handleScroll); }, []);
+      const itemsToRender = [];
+      const adInsertionIndex = 4;
+      newsToDisplay.forEach((news, index) => { /* ...código mantido... */
+           itemsToRender.push( <div key={news.id} ref={index === newsToDisplay.length - 1 ? lastNewsElementRef : null} > <NewsCard news={news} onOpenModal={setSelectedNews} isDarkMode={isDarkMode} toggleFavorite={toggleFavorite} isFavorited={favoritedNews.has(news.id)} currentlySpeakingId={currentlySpeakingId} setCurrentlySpeakingId={setCurrentlySpeakingId} /> </div> ); if (index === adInsertionIndex - 1 && newsToDisplay.length >= adInsertionIndex) { itemsToRender.push(<AdCard key="ad-card-middle" isDarkMode={isDarkMode} />); }
+      });
 
-            // Modal action buttons
-            speakBtn.addEventListener('click', () => speakText(speakBtn.dataset.text));
-            shareBtn.addEventListener('click', () => shareNews(shareBtn.dataset.title, shareBtn.dataset.url));
+      // --- Renderização do App ---
+      return (
+        <div className={`flex flex-col min-h-screen transition-colors duration-300 ${isDarkMode ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"}`}>
+           {/* Header */}
+           <header className={`p-4 sticky top-0 z-20 shadow-lg ${isDarkMode ? "bg-gray-800" : "bg-gray-200"}`}>
+              {/* ...código do header mantido com ícone de config... */}
+                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"> <div className="flex flex-col sm:flex-row justify-between items-center gap-3 sm:gap-4"> <div className="flex items-center flex-shrink-0"> <h1 className={`font-bold text-xl sm:text-2xl tracking-tight ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}>NewsFlow</h1> </div> <div className="flex items-center space-x-2 sm:space-x-3"> <span title={`${newsToDisplay.length} notícias exibidas`} className={`news-count-badge flex items-center justify-center text-xs font-semibold px-2.5 py-1 rounded-full ${isDarkMode ? 'bg-gray-700 text-gray-200' : 'bg-gray-300 text-gray-700'}`}> {isLoading && !showFavoritesOnly ? ( <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> ) : ( newsToDisplay.length )} </span> <button onClick={toggleDarkMode} title={isDarkMode ? "Modo Claro" : "Modo Escuro"} className={`p-2 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-yellow-400" : "text-gray-700 hover:bg-gray-300 hover:text-blue-600"}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">{isDarkMode ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" /> : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />}</svg> </button> <button onClick={() => setShowPremiumModal(true)} title="Opções Premium" className={`p-2 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-green-400" : "text-gray-700 hover:bg-gray-300 hover:text-green-600"}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18L12 6M12 18L9 15M12 18L15 15M12 6L9 9M12 6L15 9M5 21H19C20.1046 21 21 20.1046 21 19V5C21 3.89543 20.1046 3 19 3H5C3.89543 3 3 3.89543 3 5V19C3 20.1046 3.89543 21 5 21Z" /></svg> </button> <button onClick={() => fetchAndParseRss(activeCategory === "Favoritos" ? "Todas" : "Favoritos")} title={activeCategory === "Favoritos" ? "Mostrar Todas" : "Mostrar Favoritos"} className={`p-2 rounded-full transition-colors duration-200 ${activeCategory === "Favoritos" ? (isDarkMode ? "text-red-500 bg-red-900 bg-opacity-30" : "text-red-600 bg-red-100") : (isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-red-400" : "text-gray-700 hover:bg-gray-300 hover:text-red-600")}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={activeCategory === "Favoritos" ? "currentColor" : "none"} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={activeCategory === "Favoritos" ? 1 : 2}> <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /> </svg> </button> <button onClick={() => alert('Configurações...')} title="Configurações" className={`p-2 rounded-full transition-colors duration-200 ${isDarkMode ? "text-gray-300 hover:bg-gray-700 hover:text-blue-400" : "text-gray-700 hover:bg-gray-300 hover:text-blue-600"}`} > <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"> <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /> <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /> </svg> </button> </div> </div> </div>
+           </header>
 
-            // Admin listeners
-            loginBtn.addEventListener('click', adminLogin);
-            logoutBtn.addEventListener('click', adminLogout);
-            addFeedBtn.addEventListener('click', () => showAddFeedForm());
-            saveFeedBtn.addEventListener('click', handleSaveFeed);
-            cancelFeedBtn.addEventListener('click', hideAddFeedForm);
-            
-            // Settings Save Buttons
-            saveAppSettings.addEventListener('click', handleSaveAppSettings);
-            saveAdmobSettings.addEventListener('click', handleSaveAdmobSettings);
-            saveGlobalFallback.addEventListener('click', handleSaveGlobalFallback);
-            saveCategoryFallbacks.addEventListener('click', handleSaveCategoryFallbacks);
+           {/* Navegação, Anúncio, Busca */}
+           <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+             <Navigation onCategoryChange={fetchAndParseRss} activeCategory={activeCategory} isDarkMode={isDarkMode} />
+             <AdBanner position="top" isDarkMode={isDarkMode} />
+             <SearchAndFilters searchQuery={searchQuery} setSearchQuery={setSearchQuery} sortBy={sortBy} setSortBy={setSortBy} handleRefresh={handleRefresh} isDarkMode={isDarkMode} isLoading={isLoading && !showFavoritesOnly} />
+           </div>
 
-            // Close settings/filter panels on Escape key
-            document.addEventListener('keydown', (e) => {
-                 if (e.key === 'Escape') {
-                     if (!settingsPanel.classList.contains('hidden')) closeSettingsPanel();
-                     if (!filterDropdown.classList.contains('hidden')) closeFilterDropdown();
-                     if (!newsModal.classList.contains('hidden')) closeNewsModal();
-                     if (!interstitialAd.classList.contains('hidden')) closeInterstitialAd(false); // Close ad, don't open news
-                }
-            });
-            
-             // Watch for system theme changes if 'system' is selected
-             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
-                if (localStorage.getItem('theme') === 'system' || !localStorage.getItem('theme')) {
-                    applyTheme('system');
-                 }
-            });
-        }
+           {/* Conteúdo Principal (Grid) */}
+           <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 flex-grow">
+            {/* Mensagem de Erro */}
+             {error && ( <div className={`p-4 mb-6 rounded-lg text-center ${isDarkMode ? 'bg-red-800 text-red-100' : 'bg-red-100 text-red-700'}`}> <p className="font-bold text-lg mb-2">Ops! Algo deu errado.</p> <p className="text-sm">{error}</p> <button onClick={handleRefresh} className={`mt-3 px-4 py-1.5 rounded text-sm font-medium ${isDarkMode ? 'bg-red-600 hover:bg-red-500' : 'bg-red-200 hover:bg-red-300'}`}>Tentar Novamente</button> </div> )}
+             {/* Grid ou Mensagens */}
+             {isLoading && itemsToRender.length === 0 && !showFavoritesOnly && !error ? ( <div className="text-center py-10"> <p className={`text-xl font-semibold mb-2 ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Carregando {activeCategory}...</p> <svg className={`animate-spin mx-auto h-10 w-10 ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"> <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle> <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path> </svg> </div> ) : itemsToRender.length > 0 ? ( <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"> {itemsToRender} </div> ) : !isLoading && !error ? ( <p className={`text-center py-10 text-lg ${isDarkMode ? "text-gray-500" : "text-gray-600"}`}> Nenhuma notícia encontrada para "{activeCategory}"{searchQuery ? ` com "${searchQuery}"` : ''}. </p> ) : null}
+             {/* Load More Indicator */}
+             {isLoading && itemsToRender.length > 0 && !showFavoritesOnly && ( <div className="text-center py-6 mt-6"> <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Carregando mais...</p> </div> )}
+             {/* Fim das Notícias */}
+             {!isLoading && displayedNewsCount >= filteredNews.length && filteredNews.length > 0 && !showFavoritesOnly && ( <div className="text-center py-10 mt-6"> <p className={`text-lg font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Fim das notícias.</p> </div> )}
+             {showFavoritesOnly && filteredNews.length > 0 && ( <div className="text-center py-10 mt-6"> <p className={`text-lg font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Exibindo {filteredNews.length} favorito(s).</p> </div> )}
+             {showFavoritesOnly && filteredNews.length === 0 && !isLoading && ( <div className="text-center py-10 mt-6"> <p className={`text-lg font-semibold ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}>Você ainda não tem favoritos.</p><p className={`text-sm ${isDarkMode ? "text-gray-500" : "text-gray-600"}`}>Clique no ❤️ para adicionar.</p> </div> )}
+           </main>
 
-        // --- Start the App ---
-        document.addEventListener('DOMContentLoaded', init);
+           {/* Anúncio Inferior e Footer (mantidos) */}
+           <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6"> <AdBanner position="footer" isDarkMode={isDarkMode} /> </div>
+           <footer className={`w-full py-6 mt-auto ${isDarkMode ? 'bg-gray-800' : 'bg-gray-200'}`}> <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center"> <p className={`text-sm ${isDarkMode ? "text-gray-400" : "text-gray-600"}`}> © {new Date().getFullYear()} Todos os direitos reservados.<br /> Desenvolvido por João Ricardo - Engenheiro da Computação{' '} <a href="https://www.instagram.com/joaoricardo.pe" target="_blank" rel="noopener noreferrer" className={`font-medium hover:underline ${isDarkMode ? "text-blue-400" : "text-blue-600"}`}> @joaoricardo.pe </a> </p> </div> </footer>
 
-    </script>
+           {/* Botão Scroll-to-Top (mantido) */}
+           {showScrollTop && ( <button onClick={scrollToTop} title="Voltar ao topo" className={`fixed bottom-6 right-6 p-3 rounded-full shadow-lg transition-all duration-300 z-30 ${isDarkMode ? "bg-blue-600 text-white hover:bg-blue-700" : "bg-blue-500 text-white hover:bg-blue-600"}`}> <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 15l7-7 7 7" /></svg> </button> )}
+
+           {/* Modais (mantidos) */}
+           <NewsModal news={selectedNews} onClose={() => { if (selectedNews && currentlySpeakingId === selectedNews.id) { speechManager.cancel(() => setCurrentlySpeakingId(null)); } setSelectedNews(null); }} isDarkMode={isDarkMode} toggleFavorite={toggleFavorite} isFavorited={selectedNews ? favoritedNews.has(selectedNews.id) : false} onOpenModal={setSelectedNews} currentlySpeakingId={currentlySpeakingId} setCurrentlySpeakingId={setCurrentlySpeakingId} />
+           {showPremiumModal && ( <PremiumAdModal onClose={() => setShowPremiumModal(false)} isDarkMode={isDarkMode} /> )}
+        </div>
+      );
+    };
+
+    // Renderiza a aplicação
+    const root = ReactDOM.createRoot(document.getElementById("root"));
+    root.render(<App />);
+  </script>
 </body>
 </html>
